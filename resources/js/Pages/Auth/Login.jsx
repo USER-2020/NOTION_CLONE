@@ -51,7 +51,7 @@ export default function Login({ status, canResetPassword }) {
                     </div>
                 )}
 
-                <div className="theme-surface mb-6 rounded-[2rem] border p-5 shadow-[0_18px_45px_-30px_rgba(30,11,84,0.18)]">
+                {/* <div className="theme-surface mb-6 rounded-[2rem] border p-5 shadow-[0_18px_45px_-30px_rgba(30,11,84,0.18)]">
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <p className="theme-text-muted text-xs uppercase tracking-[0.28em]">Acceso de prueba</p>
@@ -75,7 +75,7 @@ export default function Login({ status, canResetPassword }) {
                             <p className="theme-text-primary mt-1 text-sm font-medium">password</p>
                         </div>
                     </div>
-                </div>
+                </div> */}
 
                 <form onSubmit={submit} className="theme-surface space-y-5 rounded-[2rem] border p-6 shadow-[0_18px_45px_-30px_rgba(30,11,84,0.22)]">
                     <div>
