@@ -34,6 +34,12 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        if ($request->user()->must_change_password) {
+            return redirect()
+                ->route('profile.edit')
+                ->with('status', 'Debes cambiar tu contrasena antes de continuar.');
+        }
+
         return redirect()->intended(RouteServiceProvider::HOME);
     }
 

@@ -44,6 +44,7 @@ class TaskAndMemberNotificationTest extends TestCase
         $createdUser = User::where('email', 'nuevo@smartsend.test')->firstOrFail();
 
         Notification::assertSentTo($createdUser, MemberWelcomeNotification::class);
+        $this->assertTrue($createdUser->must_change_password);
     }
 
     public function test_assigning_a_task_sends_email_to_new_assignees(): void
@@ -100,6 +101,51 @@ class TaskAndMemberNotificationTest extends TestCase
         ])->assertRedirect();
 
         Notification::assertSentTo($member, TaskStatusChangedNotification::class);
+    }
+
+    public function test_task_update_can_create_subtasks_with_assignees_in_single_save(): void
+    {
+        [$manager, $member, $project] = $this->projectFixture();
+
+        $task = Task::create([
+            'project_id' => $project->id,
+            'title' => 'Preparar rollout',
+            'description' => 'Tarea principal.',
+            'status' => 'todo',
+            'priority' => 'medium',
+            'reporter_id' => $manager->id,
+            'position' => 0,
+        ]);
+
+        $this->actingAs($manager)->patch(route('tasks.update', $task), [
+            'project_id' => $project->id,
+            'title' => $task->title,
+            'description' => $task->description,
+            'status' => $task->status,
+            'priority' => $task->priority,
+            'assignee_ids' => [],
+            'start_date' => null,
+            'due_date' => null,
+            'position' => $task->position,
+            'subtasks' => [
+                [
+                    'title' => 'Definir checklist',
+                    'status' => 'todo',
+                    'assignee_ids' => [$member->id],
+                    'start_date' => '2026-06-23',
+                    'due_date' => '2026-06-24',
+                ],
+            ],
+        ])->assertRedirect();
+
+        $subtask = $task->children()->first();
+
+        $this->assertNotNull($subtask);
+        $this->assertSame('Definir checklist', $subtask->title);
+        $this->assertSame('todo', $subtask->status);
+        $this->assertSame('2026-06-23', $subtask->start_date?->toDateString());
+        $this->assertSame('2026-06-24', $subtask->due_date?->toDateString());
+        $this->assertSame([$member->id], $subtask->assignees()->pluck('users.id')->all());
     }
 
     public function test_adding_a_comment_sends_email_to_project_participants_except_actor(): void

@@ -23,7 +23,7 @@ use Inertia\Inertia;
 
 Route::redirect('/', '/dashboard');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth', 'verified', 'password.change.required'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/documentation', fn () => Inertia::render('Documentation/Index', [
         'documentationUrl' => 'https://deepwiki.com/USER-2020/NOTION_CLONE',
@@ -37,6 +37,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/workspaces', [WorkspaceController::class, 'store'])->name('workspaces.store');
     Route::patch('/workspaces/current', [WorkspaceController::class, 'switch'])->name('workspaces.switch');
     Route::patch('/workspaces/{workspace}', [WorkspaceController::class, 'update'])->name('workspaces.update');
+    Route::delete('/workspaces/{workspace}', [WorkspaceController::class, 'destroy'])->name('workspaces.destroy');
     Route::get('/tasks', [TaskController::class, 'index'])->name('tasks.index');
     Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store');
     Route::patch('/tasks/{task}/move', [TaskController::class, 'move'])->name('tasks.move');

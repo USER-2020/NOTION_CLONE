@@ -94,6 +94,7 @@ class UserManagementController extends Controller
             'password' => $validated['password'],
             'status' => $validated['status'],
             'theme_preference' => 'system',
+            'must_change_password' => true,
         ]);
 
         $user->assignRole($validated['role']);

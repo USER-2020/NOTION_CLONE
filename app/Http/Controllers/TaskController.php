@@ -15,6 +15,7 @@ use App\Notifications\TaskCommentNotification;
 use App\Notifications\TaskStatusChangedNotification;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -98,12 +99,15 @@ class TaskController extends Controller
         $this->authorize('create', Task::class);
 
         $task = Task::create([
-            ...collect($request->validated())->except('assignee_ids')->all(),
+            ...collect($request->validated())->except(['assignee_ids', 'subtasks'])->all(),
             'reporter_id' => $request->user()->id,
             'position' => $request->integer('position', $this->nextPosition($request->string('status')->toString())),
             'assignee_id' => collect($request->input('assignee_ids', []))->filter()->map(fn ($id) => (int) $id)->first(),
         ]);
         $this->syncTaskAssignees($task, $request->input('assignee_ids', []));
+        if ($request->has('subtasks')) {
+            $this->syncTaskChildren($task, $request->input('subtasks', []), $request->user());
+        }
         $this->notifyAssignedMembers($task, [], $request->user());
 
         return back()->with('success', "Tarea '{$task->title}' creada correctamente.");
@@ -115,7 +119,7 @@ class TaskController extends Controller
 
         $originalStatus = $task->status;
         $originalAssigneeIds = $task->assignees()->pluck('users.id')->map(fn ($id) => (int) $id)->all();
-        $payload = collect($request->validated())->except('assignee_ids')->all();
+        $payload = collect($request->validated())->except(['assignee_ids', 'subtasks'])->all();
         if (($payload['status'] ?? $task->status) !== $task->status && ! array_key_exists('position', $payload)) {
             $payload['position'] = $this->nextPosition($payload['status']);
         }
@@ -124,6 +128,9 @@ class TaskController extends Controller
 
         $task->update($payload);
         $this->syncTaskAssignees($task, $request->input('assignee_ids', []));
+        if ($request->has('subtasks')) {
+            $this->syncTaskChildren($task, $request->input('subtasks', []), $request->user());
+        }
         $this->notifyAssignedMembers($task, $originalAssigneeIds, $request->user());
         $this->notifyStatusChange($task, $originalStatus, $payload['status'] ?? $originalStatus, $request->user());
 
@@ -354,7 +361,7 @@ class TaskController extends Controller
         return back()->with('success', 'Tarea eliminada correctamente.');
     }
 
-    public function storeAttachment(Request $request, Task $task): RedirectResponse
+    public function storeAttachment(Request $request, Task $task): RedirectResponse|JsonResponse
     {
         $this->authorize('update', $task);
 
@@ -363,16 +370,27 @@ class TaskController extends Controller
             'files.*' => ['file', 'mimes:jpg,jpeg,png,gif,webp,bmp,svg,pdf,txt,doc,docx', 'max:10240'],
         ]);
 
+        $createdAttachments = collect();
+
         foreach ($validated['files'] as $file) {
             $path = $file->store("tasks/{$task->id}", 'public');
 
-            $task->attachments()->create([
+            $createdAttachments->push($task->attachments()->create([
                 'uploaded_by' => $request->user()->id,
                 'disk' => 'public',
                 'path' => $path,
                 'name' => $file->getClientOriginalName(),
                 'mime_type' => $file->getClientMimeType(),
                 'size' => $file->getSize(),
+            ]));
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'attachments' => $createdAttachments
+                    ->load('uploader')
+                    ->map(fn (Attachment $attachment) => $this->serializeAttachment($attachment))
+                    ->values(),
             ]);
         }
 
@@ -485,6 +503,62 @@ class TaskController extends Controller
             ->all();
 
         $task->assignees()->sync($normalized);
+    }
+
+    private function syncTaskChildren(Task $task, array $subtasks, User $actor): void
+    {
+        $existingChildren = $task->children()->with('assignees')->get()->keyBy('id');
+        $persistedChildIds = [];
+
+        foreach (collect($subtasks)->values() as $index => $subtaskData) {
+            $subtaskId = isset($subtaskData['id']) ? (int) $subtaskData['id'] : null;
+            $assigneeIds = collect($subtaskData['assignee_ids'] ?? [])
+                ->filter(fn ($id) => filled($id))
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+
+            $payload = [
+                'project_id' => $task->project_id,
+                'parent_id' => $task->id,
+                'title' => $subtaskData['title'],
+                'description' => null,
+                'status' => $subtaskData['status'] ?? 'todo',
+                'priority' => 'medium',
+                'start_date' => $subtaskData['start_date'] ?? null,
+                'due_date' => $subtaskData['due_date'] ?? null,
+                'completed_at' => ($subtaskData['status'] ?? 'todo') === 'done' ? now() : null,
+                'assignee_id' => collect($assigneeIds)->first(),
+                'position' => $index,
+            ];
+
+            if ($subtaskId && $existingChildren->has($subtaskId)) {
+                $subtask = $existingChildren->get($subtaskId);
+                $originalStatus = $subtask->status;
+                $originalAssigneeIds = $subtask->assignees->pluck('id')->map(fn ($id) => (int) $id)->all();
+                $subtask->update($payload);
+                $this->syncTaskAssignees($subtask, $assigneeIds);
+                $this->notifyAssignedMembers($subtask, $originalAssigneeIds, $actor);
+                $this->notifyStatusChange($subtask, $originalStatus, $payload['status'], $actor);
+                $persistedChildIds[] = $subtask->id;
+                continue;
+            }
+
+            $subtask = $task->children()->create([
+                ...$payload,
+                'reporter_id' => $actor->id,
+            ]);
+            $this->syncTaskAssignees($subtask, $assigneeIds);
+            $this->notifyAssignedMembers($subtask, [], $actor);
+            $persistedChildIds[] = $subtask->id;
+        }
+
+        $task->children()
+            ->whereNotIn('id', $persistedChildIds)
+            ->get()
+            ->each
+            ->delete();
     }
 
     private function notifyAssignedMembers(Task $task, array $previousAssigneeIds, User $actor): void

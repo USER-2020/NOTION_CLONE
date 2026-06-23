@@ -4,7 +4,7 @@ import AppSelect from '@/Components/AppSelect';
 import MemberMultiSelect from '@/Components/MemberMultiSelect';
 import Modal from '@/Components/Modal';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import {
     FiArrowRight,
@@ -18,6 +18,7 @@ import {
     FiPlusCircle,
     FiSave,
     FiStar,
+    FiTrash2,
     FiUsers,
     FiX,
 } from 'react-icons/fi';
@@ -106,7 +107,9 @@ function SectionCard({ children, className = '' }) {
 
 export default function ProjectShow({ project, workspaces, managerOptions, memberOptions }) {
     const { auth } = usePage().props;
-    const canUpdateProject = auth.permissions?.includes('projects.update');
+    const canManageProject = auth.roles?.some((role) => ['super_admin', 'admin', 'project_manager'].includes(role));
+    const canUpdateProject = canManageProject;
+    const canDeleteProject = canManageProject;
     const canEditPages = auth.permissions?.includes('pages.edit');
     const [showEditProjectModal, setShowEditProjectModal] = useState(false);
     const [showCreatePageModal, setShowCreatePageModal] = useState(false);
@@ -165,9 +168,15 @@ export default function ProjectShow({ project, workspaces, managerOptions, membe
 
     function submit(event) {
         event.preventDefault();
-        form.patch(route('projects.update', project.id), {
+        form.transform((data) => ({
+            ...data,
+            _method: 'patch',
+        }));
+
+        form.post(route('projects.update', project.id), {
             forceFormData: true,
             onSuccess: () => closeEditProjectModal(),
+            onFinish: () => form.transform((data) => data),
         });
     }
 
@@ -176,6 +185,14 @@ export default function ProjectShow({ project, workspaces, managerOptions, membe
         pageForm.post(route('pages.store'), {
             onSuccess: () => closeCreatePageModal(),
         });
+    }
+
+    function destroyProject() {
+        if (!window.confirm(`Vas a eliminar el proyecto "${project.name}". Esta accion no se puede deshacer.`)) {
+            return;
+        }
+
+        router.delete(route('projects.destroy', project.id));
     }
 
     return (
@@ -229,6 +246,17 @@ export default function ProjectShow({ project, workspaces, managerOptions, membe
                                         >
                                             <FiEdit3 className="h-4 w-4" />
                                             Editar proyecto
+                                        </button>
+                                    ) : null}
+
+                                    {canDeleteProject ? (
+                                        <button
+                                            type="button"
+                                            onClick={destroyProject}
+                                            className="inline-flex items-center gap-2 rounded-2xl border border-rose-300/40 px-4 py-3 text-sm font-medium text-rose-500"
+                                        >
+                                            <FiTrash2 className="h-4 w-4" />
+                                            Eliminar proyecto
                                         </button>
                                     ) : null}
 
@@ -326,6 +354,24 @@ export default function ProjectShow({ project, workspaces, managerOptions, membe
                         <h3 className="theme-text-primary text-xl font-semibold">Equipo del proyecto</h3>
 
                         <div className="mt-5 space-y-5">
+                            <div>
+                                <p className="theme-text-muted text-xs uppercase tracking-[0.2em]">Workspace</p>
+                                <div className="mt-2 flex items-center gap-3">
+                                    {project.workspace?.logo_url ? (
+                                        <img
+                                            src={project.workspace.logo_url}
+                                            alt={`Logo de ${project.workspace.name}`}
+                                            className="h-10 w-10 rounded-2xl object-cover"
+                                        />
+                                    ) : (
+                                        <span className="theme-accent-soft rounded-2xl p-2.5">
+                                            <FiFolder className="h-4 w-4" />
+                                        </span>
+                                    )}
+                                    <p className="theme-text-secondary text-sm">{project.workspace?.name ?? 'Sin workspace'}</p>
+                                </div>
+                            </div>
+
                             <div>
                                 <p className="theme-text-muted text-xs uppercase tracking-[0.2em]">Creado por</p>
                                 <p className="theme-text-secondary mt-2 text-sm">{project.owner?.name ?? 'Sin registro'}</p>
@@ -449,8 +495,8 @@ export default function ProjectShow({ project, workspaces, managerOptions, membe
                             error={form.errors.logo}
                         />
 
-                        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
-                            <AppSelect value={form.data.priority} onChange={(event) => form.setData('priority', event.target.value)}>
+                        <div className="grid gap-4 overflow-visible lg:grid-cols-2 xl:grid-cols-4">
+                            <AppSelect wrapperClassName="min-w-0" value={form.data.priority} onChange={(event) => form.setData('priority', event.target.value)}>
                                 {Object.entries(priorityLabels).map(([value, label]) => (
                                     <option key={value} value={value}>
                                         {label}
@@ -458,7 +504,7 @@ export default function ProjectShow({ project, workspaces, managerOptions, membe
                                 ))}
                             </AppSelect>
 
-                            <AppSelect value={form.data.status} onChange={(event) => form.setData('status', event.target.value)}>
+                            <AppSelect wrapperClassName="min-w-0" value={form.data.status} onChange={(event) => form.setData('status', event.target.value)}>
                                 {Object.entries(statusLabels).map(([value, label]) => (
                                     <option key={value} value={value}>
                                         {label}
@@ -466,8 +512,19 @@ export default function ProjectShow({ project, workspaces, managerOptions, membe
                                 ))}
                             </AppSelect>
 
-                            <AppDatePicker value={form.data.start_date} onChange={(event) => form.setData('start_date', event.target.value)} placeholder="Fecha de inicio" />
-                            <AppDatePicker value={form.data.due_date} onChange={(event) => form.setData('due_date', event.target.value)} placeholder="Fecha de cierre" />
+                            <AppDatePicker
+                                wrapperClassName="min-w-0"
+                                value={form.data.start_date}
+                                onChange={(event) => form.setData('start_date', event.target.value)}
+                                placeholder="Fecha de inicio"
+                            />
+                            <AppDatePicker
+                                wrapperClassName="min-w-0"
+                                align="end"
+                                value={form.data.due_date}
+                                onChange={(event) => form.setData('due_date', event.target.value)}
+                                placeholder="Fecha de cierre"
+                            />
                         </div>
 
                         <div className="grid gap-5 xl:grid-cols-2">

@@ -74,7 +74,7 @@ export default function DocumentationIndex({ auth, documentationUrl }) {
                     </div>
                 </section>
 
-                <section className="theme-surface rounded-[2rem] border p-3 shadow-[0_18px_45px_-30px_rgba(30,11,84,0.24)] sm:p-4">
+                {/* <section className="theme-surface rounded-[2rem] border p-3 shadow-[0_18px_45px_-30px_rgba(30,11,84,0.24)] sm:p-4">
                     <div className="theme-surface-strong overflow-hidden rounded-[1.6rem] border">
                         <iframe
                             title="Documentacion del proyecto"
@@ -82,7 +82,7 @@ export default function DocumentationIndex({ auth, documentationUrl }) {
                             className="h-[72vh] w-full min-h-[540px] bg-white"
                         />
                     </div>
-                </section>
+                </section> */}
             </div>
         </AuthenticatedLayout>
     );

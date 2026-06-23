@@ -89,6 +89,53 @@ class AuthorizationFlowTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_member_cannot_update_project(): void
+    {
+        [$project, $manager, $member, $workspace] = $this->projectFixture();
+
+        $this->actingAs($member)
+            ->patch(route('projects.update', $project), [
+                'workspace_id' => $workspace->id,
+                'name' => 'Blocked update',
+                'description' => '',
+                'status' => 'active',
+                'priority' => 'high',
+                'start_date' => '',
+                'due_date' => '',
+                'icon' => 'folder',
+                'color' => '#0f766e',
+                'manager_ids' => [$manager->id],
+                'member_ids' => [$member->id],
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_member_cannot_update_workspace(): void
+    {
+        [, , $member, $workspace] = $this->projectFixture();
+
+        $this->actingAs($member)
+            ->patch(route('workspaces.update', $workspace), [
+                'name' => 'Blocked workspace update',
+                'description' => 'No permitido.',
+                'owner_id' => $workspace->owner_id,
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_member_cannot_create_workspace(): void
+    {
+        [, , $member] = $this->projectFixture();
+
+        $this->actingAs($member)
+            ->post(route('workspaces.store'), [
+                'name' => 'Blocked workspace',
+                'description' => 'No permitido.',
+                'owner_id' => $member->id,
+            ])
+            ->assertForbidden();
+    }
+
     private function projectFixture(): array
     {
         $owner = User::factory()->create();

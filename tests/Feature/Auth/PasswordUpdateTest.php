@@ -3,6 +3,7 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
+use App\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -47,5 +48,24 @@ class PasswordUpdateTest extends TestCase
         $response
             ->assertSessionHasErrors('current_password')
             ->assertRedirect('/profile');
+    }
+
+    public function test_password_update_clears_required_password_change_flag(): void
+    {
+        $user = User::factory()->create([
+            'must_change_password' => true,
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->from('/profile')
+            ->put('/password', [
+                'current_password' => 'password',
+                'password' => 'new-password',
+                'password_confirmation' => 'new-password',
+            ]);
+
+        $response->assertRedirect(RouteServiceProvider::HOME);
+        $this->assertFalse($user->refresh()->must_change_password);
     }
 }

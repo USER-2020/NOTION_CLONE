@@ -1,10 +1,11 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import AppDatePicker from '@/Components/AppDatePicker';
+import RichTextEditor from '@/Components/RichTextEditor';
 import AppSelect from '@/Components/AppSelect';
 import Modal from '@/Components/Modal';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { FiCheck, FiPaperclip, FiPlus, FiSave, FiTrash2, FiUploadCloud, FiUsers, FiX } from 'react-icons/fi';
+import { FiCalendar, FiCheck, FiChevronDown, FiFlag, FiPaperclip, FiPlus, FiSave, FiTarget, FiTrash2, FiUploadCloud, FiUsers, FiX } from 'react-icons/fi';
 
 const columns = [
     { key: 'backlog', label: 'Pendientes', accent: 'text-stone-300' },
@@ -155,6 +156,89 @@ function formatAssigneeNames(assignees) {
     return assignees.map((assignee) => assignee.name).join(', ');
 }
 
+function stripHtml(html) {
+    if (!html) {
+        return '';
+    }
+
+    return html
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function getInitials(name = '') {
+    return name
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase() ?? '')
+        .join('') || '?';
+}
+
+function avatarTone(name = '') {
+    const palette = [
+        'from-fuchsia-500 to-violet-500',
+        'from-cyan-500 to-sky-500',
+        'from-emerald-500 to-teal-500',
+        'from-amber-400 to-orange-500',
+        'from-rose-500 to-pink-500',
+        'from-indigo-500 to-blue-500',
+    ];
+
+    const total = [...name].reduce((sum, character) => sum + character.charCodeAt(0), 0);
+    return palette[total % palette.length];
+}
+
+function AssigneeAvatars({ assignees = [], limit = 4, size = 'md' }) {
+    if (!assignees.length) {
+        return (
+            <span className="inline-flex items-center rounded-full border border-dashed border-stone-700 px-2.5 py-1 text-[11px] text-stone-500">
+                Sin asignar
+            </span>
+        );
+    }
+
+    const visibleAssignees = assignees.slice(0, limit);
+    const hiddenCount = assignees.length - visibleAssignees.length;
+    const sizeClassName = size === 'sm' ? 'h-7 w-7 text-[10px]' : 'h-8 w-8 text-[11px]';
+
+    return (
+        <div className="relative flex items-center">
+            {visibleAssignees.map((assignee, index) => (
+                <div
+                    key={assignee.id}
+                    className={`${index === 0 ? '' : '-ml-2'} group/avatar relative`}
+                    aria-label={assignee.name}
+                >
+                    <div
+                        className={`relative inline-flex ${sizeClassName} items-center justify-center rounded-full border border-stone-950 bg-gradient-to-br ${avatarTone(
+                            assignee.name
+                        )} font-semibold text-white shadow-[0_8px_18px_-10px_rgba(0,0,0,0.9)]`}
+                    >
+                        {getInitials(assignee.name)}
+                    </div>
+
+                    <div className="theme-tooltip pointer-events-none absolute bottom-[calc(100%+0.55rem)] left-1/2 z-[999] -translate-x-1/2 whitespace-nowrap rounded-xl border px-3 py-2 text-[11px] font-medium opacity-0 shadow-lg transition duration-200 group-hover/avatar:opacity-100">
+                        {assignee.name}
+                    </div>
+                </div>
+            ))}
+
+            {hiddenCount > 0 ? (
+                <div
+                    className="-ml-2 inline-flex h-8 w-8 items-center justify-center rounded-full border border-stone-950 bg-stone-800 text-[10px] font-semibold text-stone-200"
+                    aria-label={`${hiddenCount} responsables adicionales`}
+                >
+                    +{hiddenCount}
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
 function MemberPicker({ label, hint, members, selectedIds, onChange }) {
     const selectedSet = new Set((selectedIds ?? []).map(Number));
 
@@ -188,22 +272,23 @@ function MemberPicker({ label, hint, members, selectedIds, onChange }) {
                                 key={member.id}
                                 type="button"
                                 onClick={() => toggleMember(member.id)}
-                                className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition ${
-                                    active
+                                className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition ${active
                                         ? 'border-[color:var(--accent)] bg-[color:var(--accent-soft)] text-[color:var(--text-primary)] shadow-[0_16px_30px_-24px_rgba(217,119,6,0.35)]'
                                         : 'theme-surface theme-border theme-text-secondary hover:border-[color:var(--accent)]'
-                                }`}
+                                    }`}
                             >
-                                <div className="min-w-0">
+                                <div className="flex min-w-0 items-center gap-3">
+                                    <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${avatarTone(member.name)} text-[11px] font-semibold text-white`}>
+                                        {getInitials(member.name)}
+                                    </span>
                                     <p className="truncate text-sm font-medium">{member.name}</p>
                                 </div>
 
                                 <span
-                                    className={`ml-3 flex h-5 w-5 items-center justify-center rounded-md border transition ${
-                                        active
+                                    className={`ml-3 flex h-5 w-5 items-center justify-center rounded-md border transition ${active
                                             ? 'border-[color:var(--accent)] bg-[color:var(--accent)] text-white'
                                             : 'theme-border bg-transparent text-transparent'
-                                    }`}
+                                        }`}
                                 >
                                     <FiCheck className="h-3.5 w-3.5" />
                                 </span>
@@ -231,6 +316,50 @@ function MemberPicker({ label, hint, members, selectedIds, onChange }) {
     );
 }
 
+function SubtaskAssigneeDropdown({ members, selectedIds, onChange }) {
+    const [open, setOpen] = useState(false);
+    const selectedMembers = members.filter((member) => (selectedIds ?? []).includes(member.id));
+
+    return (
+        <div className="relative">
+            <button
+                type="button"
+                onClick={() => setOpen((currentValue) => !currentValue)}
+                className="theme-surface theme-border inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-medium text-stone-200 transition hover:border-amber-300 hover:text-amber-200"
+            >
+                <FiUsers className="h-3.5 w-3.5" />
+                {selectedMembers.length ? `${selectedMembers.length} responsable${selectedMembers.length > 1 ? 's' : ''}` : 'Asignar responsables'}
+                <FiChevronDown className={`h-3.5 w-3.5 transition ${open ? 'rotate-180' : ''}`} />
+            </button>
+
+            {selectedMembers.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                    {selectedMembers.map((member) => (
+                        <span
+                            key={member.id}
+                            className="inline-flex rounded-full border border-[color:var(--accent)]/40 bg-[color:var(--accent-soft)] px-3 py-1 text-[11px] font-medium text-[color:var(--accent)]"
+                        >
+                            {member.name}
+                        </span>
+                    ))}
+                </div>
+            ) : null}
+
+            {open ? (
+                <div className="absolute left-0 top-[calc(100%+0.75rem)] z-20 w-full min-w-[280px] rounded-[1.5rem] border border-stone-700 bg-stone-950 p-3 shadow-[0_30px_60px_-30px_rgba(0,0,0,0.85)]">
+                    <MemberPicker
+                        label="Responsables de la subtarea"
+                        hint="Marca una o varias personas para este paso."
+                        members={members}
+                        selectedIds={selectedIds}
+                        onChange={onChange}
+                    />
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
 function subtaskProgress(task) {
     const total = task.children?.length ?? 0;
     const completed = task.children?.filter((child) => child.status === 'done').length ?? 0;
@@ -239,33 +368,61 @@ function subtaskProgress(task) {
 }
 
 function TaskCard({ task, onOpen, onDragStart, onDragEnd, draggable = true }) {
+    const dueDateLabel = task.due_date ? formatDate(task.due_date) : 'Sin fecha limite';
+    const childCount = task.children?.length ?? 0;
+
     return (
         <div
             draggable={draggable}
             onDragStart={() => draggable && onDragStart(task.id)}
             onDragEnd={() => draggable && onDragEnd()}
-            className="rounded-3xl border border-stone-800 bg-stone-950/85 p-4 shadow-[0_20px_50px_-35px_rgba(0,0,0,0.9)]"
+            className="group/card rounded-[1.4rem] border border-stone-800 bg-[#18131f] p-3 shadow-[0_24px_60px_-36px_rgba(0,0,0,0.95)] transition duration-300 hover:border-stone-700 hover:bg-[#1d1726]"
         >
-            <button type="button" onClick={() => onOpen(task.id)} className="block w-full text-left">
+            <button
+                type="button"
+                onClick={() => onOpen(task.id)}
+                className="block w-full text-left"
+            >
                 <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <p className="font-medium text-stone-100">{task.title}</p>
-                        <p className="mt-2 text-sm text-stone-400">{task.project?.name}</p>
+                    <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full border border-stone-700 bg-stone-900 px-2.5 py-1 text-[10px] uppercase tracking-[0.24em] text-stone-400">
+                                {task.project?.name ?? 'Proyecto'}
+                            </span>
+
+                            {childCount > 0 ? (
+                                <span className="rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-[10px] font-medium text-violet-200">
+                                    {childCount} subtareas
+                                </span>
+                            ) : null}
+                        </div>
+
+                        <p className="mt-3 line-clamp-2 min-w-0 text-[15px] font-semibold leading-6 text-stone-50">
+                            {task.title}
+                        </p>
                     </div>
-                    <span className="rounded-full border border-stone-700 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-stone-300">
+
+                    <span className="shrink-0 rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-amber-100">
                         {priorityLabels[task.priority] ?? task.priority}
                     </span>
                 </div>
 
-                <p className="mt-4 line-clamp-3 text-sm leading-6 text-stone-400">
-                    {task.description || 'Abre la tarea para agregar contexto, fechas, archivos y responsables.'}
-                </p>
+                <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-stone-400">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-stone-700 px-2.5 py-1">
+                        <FiFlag className="h-3 w-3 text-amber-300" />
+                        {statusLabels[task.status] ?? task.status}
+                    </span>
 
-                <div className="mt-4 flex items-center justify-between gap-3 text-xs text-stone-500">
-                    <span>{formatAssigneeNames(task.assignees)}</span>
-                    <span>{formatDate(task.due_date)}</span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-stone-700 px-2.5 py-1">
+                        <FiCalendar className="h-3 w-3 text-sky-300" />
+                        {dueDateLabel}
+                    </span>
                 </div>
             </button>
+
+            <div className="mt-4 flex items-center justify-between gap-3">
+                <AssigneeAvatars assignees={task.assignees} size="sm" />
+            </div>
         </div>
     );
 }
@@ -311,6 +468,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
         assignee_ids: [],
         start_date: '',
         due_date: '',
+        status: 'todo',
     });
 
     const taskForm = useForm({
@@ -323,6 +481,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
         start_date: '',
         due_date: '',
         position: 0,
+        subtasks: [],
     });
     const [subtaskScheduleDrafts, setSubtaskScheduleDrafts] = useState({});
 
@@ -368,6 +527,15 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
             start_date: selectedTask.start_date ?? '',
             due_date: selectedTask.due_date ?? '',
             position: selectedTask.position ?? 0,
+            subtasks: (selectedTask.children ?? []).map((child) => ({
+                id: child.id,
+                client_key: `existing-${child.id}`,
+                title: child.title ?? '',
+                status: child.status ?? 'todo',
+                assignee_ids: child.assignee_ids ?? [],
+                start_date: child.start_date ?? '',
+                due_date: child.due_date ?? '',
+            })),
         });
         setSubtaskScheduleDrafts(
             Object.fromEntries(
@@ -503,35 +671,116 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
         }));
     }
 
-    const taskProgress = selectedTask ? subtaskProgress(selectedTask) : { total: 0, completed: 0, percent: 0 };
+    function addDraftSubtask(event) {
+        event.preventDefault();
+
+        if (!subtaskForm.data.title.trim()) {
+            subtaskForm.setError('title', 'Escribe un titulo para la subtarea.');
+            return;
+        }
+
+        taskForm.setData('subtasks', [
+            ...(taskForm.data.subtasks ?? []),
+            {
+                client_key: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                title: subtaskForm.data.title.trim(),
+                status: subtaskForm.data.status ?? 'todo',
+                assignee_ids: subtaskForm.data.assignee_ids ?? [],
+                start_date: subtaskForm.data.start_date ?? '',
+                due_date: subtaskForm.data.due_date ?? '',
+            },
+        ]);
+
+        subtaskForm.reset();
+        subtaskForm.setData('status', 'todo');
+        subtaskForm.clearErrors();
+    }
+
+    function updateDraftSubtask(clientKey, changes) {
+        taskForm.setData(
+            'subtasks',
+            (taskForm.data.subtasks ?? []).map((subtask) =>
+                subtask.client_key === clientKey
+                    ? { ...subtask, ...changes }
+                    : subtask
+            )
+        );
+    }
+
+    function removeDraftSubtask(clientKey) {
+        taskForm.setData(
+            'subtasks',
+            (taskForm.data.subtasks ?? []).filter((subtask) => subtask.client_key !== clientKey)
+        );
+    }
+
+    const visibleSubtasks = canFullyManageTasks
+        ? (taskForm.data.subtasks ?? [])
+        : (selectedTask?.children ?? []);
+
+    const taskProgress = selectedTask
+        ? subtaskProgress({ children: visibleSubtasks })
+        : { total: 0, completed: 0, percent: 0 };
     const filteredBoardTasks = filterTasksByPriority(boardTasks, priorityFilter);
     const filteringByPriority = priorityFilter !== 'all';
+    const completedTasksCount = boardTasks.filter((task) => task.status === 'done').length;
+    const sprintVelocity = boardTasks.length ? Math.round((completedTasksCount / boardTasks.length) * 100) : 0;
+    const inFlightTasksCount = boardTasks.filter((task) => ['todo', 'in_progress', 'review'].includes(task.status)).length;
 
     return (
         <AuthenticatedLayout user={auth.user} header={<div className="flex items-center gap-3"><FiUsers className="h-7 w-7 text-amber-300" /><h2 className="text-3xl font-semibold text-stone-50">Tareas</h2></div>}>
             <Head title="Tareas" />
 
             <div className="space-y-6">
-                <section className="rounded-[2rem] border border-stone-800 bg-stone-900/70 p-6">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <section className="overflow-hidden rounded-[2.2rem] border border-stone-800 bg-[#130f19] shadow-[0_30px_90px_-50px_rgba(0,0,0,0.95)]">
+                    <div className="flex flex-col gap-5 border-b border-stone-800 bg-[radial-gradient(circle_at_top_left,_rgba(168,85,247,0.18),_transparent_34%),linear-gradient(180deg,rgba(24,19,31,0.98),rgba(19,15,25,0.98))] p-6 sm:p-7 lg:flex-row lg:items-start lg:justify-between">
                         <div>
-                            <p className="text-xs uppercase tracking-[0.3em] text-amber-300">Tablero</p>
-                            <h3 className="mt-2 text-2xl font-semibold text-stone-50">Mueve el trabajo como más te guste</h3>
-                            <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-400">
-                                Arrastra tareas entre columnas, abre cualquier tarjeta en su panel lateral, asigna compañeros y adjunta archivos o imágenes de referencia.
-                            </p>
+                            <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.28em] text-stone-500">
+                                <span className="inline-flex items-center rounded-full border border-stone-700 bg-stone-900 px-3 py-1 text-stone-300">
+                                    Board 
+                                </span>
+                                {activeProject ? <span>{activeProject.name}</span> : <span>Workspace sprint</span>}
+                            </div>
+                            {/* <h3 className="mt-4 text-3xl font-semibold tracking-tight text-stone-50 sm:text-[2.3rem]">Orquesta el sprint con backlog, enfoque, progreso y cierre visible.</h3>
+                            <p className="mt-3 max-w-3xl text-sm leading-7 text-stone-400">
+                                Reorganicemos el tablero con una lectura mas scrum: prioridades claras, trabajo en curso visible, responsables con avatar por inicial y cards listas para daily, planning o review.
+                            </p> */}
                         </div>
 
                         {canCreateTasks ? (
                             <button
                                 type="button"
                                 onClick={() => setShowCreateTaskModal(true)}
-                                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-300 px-5 py-3 font-medium text-stone-950 transition hover:bg-amber-200"
+                                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-lime-300 px-5 py-3 text-sm font-semibold text-stone-950 transition hover:bg-lime-200"
                             >
                                 <FiPlus className="h-4 w-4" />
                                 Crear tarea
                             </button>
                         ) : null}
+                    </div>
+
+                    <div className="grid gap-3 border-t border-stone-800 px-6 py-6 md:grid-cols-3">
+                        <div className="rounded-[1.6rem] border border-stone-800 bg-[#1a1420] p-4">
+                            <p className="text-[11px] uppercase tracking-[0.26em] text-stone-500">Historias totales</p>
+                            <p className="mt-3 text-3xl font-semibold text-stone-50">{boardTasks.length}</p>
+                            <p className="mt-2 text-sm text-stone-400">Todo el alcance visible del sprint actual.</p>
+                        </div>
+                        <div className="rounded-[1.6rem] border border-stone-800 bg-[#1a1420] p-4">
+                            <p className="text-[11px] uppercase tracking-[0.26em] text-stone-500">Trabajo en curso</p>
+                            <p className="mt-3 text-3xl font-semibold text-stone-50">{inFlightTasksCount}</p>
+                            <p className="mt-2 text-sm text-stone-400">Items que todavia consumen foco del equipo.</p>
+                        </div>
+                        <div className="rounded-[1.6rem] border border-stone-800 bg-[#1a1420] p-4">
+                            <div className="flex items-center justify-between gap-3">
+                                <p className="text-[11px] uppercase tracking-[0.26em] text-stone-500">Velocidad</p>
+                                <span className="inline-flex items-center gap-1 rounded-full border border-stone-700 bg-stone-900 px-2.5 py-1 text-[10px] text-stone-300">
+                                    <FiTarget className="h-3 w-3 text-amber-300" />
+                                    Sprint
+                                </span>
+                            </div>
+                            <p className="mt-3 text-3xl font-semibold text-stone-50">{sprintVelocity}%</p>
+                            <p className="mt-2 text-sm text-stone-400">Valor entregado frente al total del tablero.</p>
+                        </div>
                     </div>
 
                     {canCreateTasks ? (
@@ -547,7 +796,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                     <div className="mt-5 flex flex-col gap-3 rounded-3xl border border-stone-800 bg-stone-950/40 p-4">
                         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                             <div>
-                                <p className="text-xs uppercase tracking-[0.24em] text-stone-500">Filtro de urgencia</p>
+                                <p className="text-xs uppercase tracking-[0.24em] text-stone-500">Filtro de prioridad scrum</p>
                                 <p className="mt-1 text-sm text-stone-400">
                                     Filtra el tablero por nivel de prioridad para enfocarte en lo más importante.
                                 </p>
@@ -569,11 +818,10 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                             <button
                                 type="button"
                                 onClick={() => setPriorityFilter('all')}
-                                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                                    priorityFilter === 'all'
-                                        ? 'bg-amber-300 text-stone-950'
+                                className={`rounded-full px-4 py-2 text-sm font-medium transition ${priorityFilter === 'all'
+                                        ? 'bg-stone-100 text-stone-950'
                                         : 'border border-stone-700 text-stone-300 hover:border-stone-500'
-                                }`}
+                                    }`}
                             >
                                 Todas
                             </button>
@@ -583,11 +831,10 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                     key={priority}
                                     type="button"
                                     onClick={() => setPriorityFilter(priority)}
-                                    className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                                        priorityFilter === priority
+                                    className={`rounded-full px-4 py-2 text-sm font-medium transition ${priorityFilter === priority
                                             ? 'bg-amber-300 text-stone-950'
                                             : 'border border-stone-700 text-stone-300 hover:border-stone-500'
-                                    }`}
+                                        }`}
                                 >
                                     {priorityLabels[priority]}
                                 </button>
@@ -602,20 +849,29 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                     </div>
                 </section>
 
-                <section className="grid gap-4 2xl:grid-cols-6 xl:grid-cols-3">
+                <section className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-6">
                     {columns.map((column) => {
                         const columnTasks = tasksForStatus(filteredBoardTasks, column.key);
 
                         return (
-                            <div key={column.key} className="rounded-[2rem] border border-stone-800 bg-stone-900/70 p-4">
-                                <div className="flex items-center justify-between gap-3">
-                                    <div>
+                            <div key={column.key} className="rounded-[2rem] border border-stone-800 bg-[#15111a] p-4 shadow-[0_24px_70px_-45px_rgba(0,0,0,0.95)]">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
                                         <p className={`text-xs uppercase tracking-[0.25em] ${column.accent}`}>{column.label}</p>
-                                        <p className="mt-2 text-sm text-stone-500">{columnTasks.length} tareas</p>
+                                        <div className="mt-3 flex items-center gap-2">
+                                            <p className="text-lg font-semibold text-stone-50">{columnTasks.length}</p>
+                                            <span className="rounded-full border border-stone-700 bg-stone-900 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-stone-400">
+                                                cards
+                                            </span>
+                                        </div>
+                                        <p className="mt-2 text-xs text-stone-500">
+                                            {column.key === 'backlog' ? 'Pendiente de tomar en el sprint.' : column.key === 'done' ? 'Listo para review o entrega.' : 'Trabajo activo del equipo.'}
+                                        </p>
                                     </div>
+                                    <div className={`mt-1 h-2.5 w-2.5 rounded-full ${column.accent.replace('text-', 'bg-')} opacity-80`} />
                                 </div>
 
-                                <div className="mt-4">
+                                <div className="mt-5">
                                     {columnTasks.length === 0 && (
                                         <button
                                             type="button"
@@ -627,11 +883,10 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                                 setDragTarget({ status: column.key, position: 0 });
                                             }}
                                             onDrop={() => !filteringByPriority && handleMoveTask(column.key, 0)}
-                                            className={`flex min-h-[120px] w-full flex-col items-center justify-center gap-2 rounded-3xl border border-dashed p-4 text-sm transition ${
-                                                dragTarget?.status === column.key && dragTarget?.position === 0
+                                            className={`flex min-h-[132px] w-full flex-col items-center justify-center gap-2 rounded-[1.7rem] border border-dashed p-4 text-sm transition ${dragTarget?.status === column.key && dragTarget?.position === 0
                                                     ? 'border-amber-300 bg-amber-300/10 text-amber-200'
                                                     : 'border-stone-700 text-stone-500'
-                                            }`}
+                                                }`}
                                         >
                                             <FiPlus className="h-5 w-5" />
                                             Suelta una tarea aquí
@@ -649,11 +904,10 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                                     setDragTarget({ status: column.key, position: index });
                                                 }}
                                                 onDrop={() => !filteringByPriority && handleMoveTask(column.key, index)}
-                                                className={`mb-3 rounded-full transition ${
-                                                    dragTarget?.status === column.key && dragTarget?.position === index
+                                                className={`mb-3 rounded-full transition ${dragTarget?.status === column.key && dragTarget?.position === index
                                                         ? 'h-3 bg-amber-300/80'
                                                         : 'h-1 bg-transparent'
-                                                }`}
+                                                    }`}
                                             />
 
                                             <TaskCard
@@ -679,11 +933,10 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                                 setDragTarget({ status: column.key, position: columnTasks.length });
                                             }}
                                             onDrop={() => !filteringByPriority && handleMoveTask(column.key, columnTasks.length)}
-                                            className={`mt-3 rounded-full transition ${
-                                                dragTarget?.status === column.key && dragTarget?.position === columnTasks.length
+                                            className={`mt-3 rounded-full transition ${dragTarget?.status === column.key && dragTarget?.position === columnTasks.length
                                                     ? 'h-3 bg-amber-300/80'
                                                     : 'h-1 bg-transparent'
-                                            }`}
+                                                }`}
                                         />
                                     )}
                                 </div>
@@ -751,21 +1004,15 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                 </div>
 
                                 {canFullyManageTasks && <form
-                                    onSubmit={(event) => {
-                                        event.preventDefault();
-
-                                        subtaskForm.post(route('tasks.subtasks.store', selectedTask.id), {
-                                            preserveScroll: true,
-                                            onSuccess: () => subtaskForm.reset(),
-                                        });
-                                    }}
+                                    onSubmit={addDraftSubtask}
                                     className="mt-5 space-y-4"
                                 >
-                                    <input
-                                        className="rounded-2xl border border-stone-700 bg-stone-950 px-4 py-3 text-stone-100"
-                                        placeholder="Agregar un paso más pequeño dentro de esta tarea"
+                                    <RichTextEditor
+                                        editorClassName="min-h-[88px] px-4 py-3 text-sm leading-6"
                                         value={subtaskForm.data.title}
-                                        onChange={(event) => subtaskForm.setData('title', event.target.value)}
+                                        onChange={(nextValue) => subtaskForm.setData('title', nextValue)}
+                                        onSubmitShortcut={addDraftSubtask}
+                                        placeholder="Agregar un paso más pequeño dentro de esta tarea. Enter crea la subtarea y Shift + Enter agrega salto de linea."
                                     />
                                     <MemberPicker
                                         label="Responsables"
@@ -788,14 +1035,13 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                             placeholder="Fecha limite"
                                         />
                                     </div>
-                                    <button
+                                    {/* <button
                                         type="submit"
-                                        disabled={subtaskForm.processing}
-                                        className="inline-flex items-center gap-2 rounded-2xl bg-stone-100 px-4 py-3 text-sm font-medium text-stone-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+                                        className="inline-flex items-center gap-2 rounded-2xl bg-amber-300 px-4 py-3 text-sm font-medium text-stone-950 transition hover:bg-amber-200"
                                     >
                                         <FiPlus className="h-4 w-4" />
-                                        Crear subtarea
-                                    </button>
+                                        Agregar subtarea al borrador
+                                    </button> */}
                                 </form>}
 
                                 {canFullyManageTasks && (subtaskForm.errors.title || subtaskForm.errors.assignee_ids) && (
@@ -805,14 +1051,15 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                 )}
 
                                 <div className="mt-5 grid gap-3">
-                                    {selectedTask.children?.length ? (
-                                        selectedTask.children.map((child) => (
-                                            <div key={child.id} className="rounded-3xl border border-stone-800 bg-stone-950/80 p-4">
+                                    {visibleSubtasks.length ? (
+                                        visibleSubtasks.map((child) => (
+                                            <div key={child.client_key ?? child.id} className="rounded-3xl border border-stone-800 bg-stone-950/80 p-4">
                                                 <div className="flex items-start gap-3">
                                                     <button
                                                         type="button"
-                                                        onClick={() => {
-                                                            router.patch(
+                                                        onClick={() => canFullyManageTasks
+                                                            ? updateDraftSubtask(child.client_key, { status: child.status === 'done' ? 'todo' : 'done' })
+                                                            : router.patch(
                                                                 route('tasks.subtasks.update', [selectedTask.id, child.id]),
                                                                 {
                                                                     status: child.status === 'done' ? 'todo' : 'done',
@@ -820,26 +1067,56 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                                                     title: child.title,
                                                                 },
                                                                 { preserveScroll: true }
-                                                            );
-                                                        }}
-                                                        className={`mt-1 flex h-5 w-5 items-center justify-center rounded-full border transition ${
-                                                            child.status === 'done'
+                                                            )}
+                                                        className={`mt-1 flex h-5 w-5 items-center justify-center rounded-full border transition ${child.status === 'done'
                                                                 ? 'border-emerald-400 bg-emerald-400 text-stone-950'
                                                                 : 'border-stone-600 bg-stone-950 text-transparent hover:border-amber-300'
-                                                        }`}
+                                                            }`}
                                                     >
                                                         •
                                                     </button>
 
                                                     <div className="min-w-0 flex-1">
-                                                        <p className={`font-medium ${child.status === 'done' ? 'text-stone-500 line-through' : 'text-stone-100'}`}>
-                                                            {child.title}
-                                                        </p>
+                                                        {canFullyManageTasks ? (
+                                                            <input
+                                                                className={`w-full rounded-2xl border border-stone-700 bg-stone-950 px-3 py-2 text-sm ${child.status === 'done' ? 'text-stone-500 line-through' : 'text-stone-100'}`}
+                                                                value={child.title}
+                                                                onChange={(event) => updateDraftSubtask(child.client_key, { title: event.target.value })}
+                                                            />
+                                                        ) : (
+                                                            <p className={`font-medium ${child.status === 'done' ? 'text-stone-500 line-through' : 'text-stone-100'}`}>
+                                                                {child.title}
+                                                            </p>
+                                                        )}
                                                         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-stone-500">
-                                                            <span>{formatAssigneeNames(child.assignees)}</span>
+                                                            <span>{formatAssigneeNames(canFullyManageTasks ? membersForProject(selectedTask.project_id).filter((member) => (child.assignee_ids ?? []).includes(member.id)) : child.assignees)}</span>
                                                             <span>{statusLabels[child.status] ?? child.status.replace('_', ' ')}</span>
                                                         </div>
-                                                        {canScheduleTasks && (
+                                                        {canFullyManageTasks ? (
+                                                            <div className="mt-4 space-y-4">
+                                                                <SubtaskAssigneeDropdown
+                                                                    members={membersForProject(selectedTask.project_id)}
+                                                                    selectedIds={child.assignee_ids ?? []}
+                                                                    onChange={(ids) =>
+                                                                        updateDraftSubtask(child.client_key, { assignee_ids: ids })
+                                                                    }
+                                                                />
+                                                                <div className="grid gap-3 md:grid-cols-2">
+                                                                    <AppDatePicker
+                                                                        className="border-stone-700 bg-stone-950 text-stone-100"
+                                                                        value={child.start_date ?? ''}
+                                                                        onChange={(event) => updateDraftSubtask(child.client_key, { start_date: event.target.value })}
+                                                                        placeholder="Fecha de inicio"
+                                                                    />
+                                                                    <AppDatePicker
+                                                                        className="border-stone-700 bg-stone-950 text-stone-100"
+                                                                        value={child.due_date ?? ''}
+                                                                        onChange={(event) => updateDraftSubtask(child.client_key, { due_date: event.target.value })}
+                                                                        placeholder="Fecha limite"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        ) : canScheduleTasks && (
                                                             <form
                                                                 onSubmit={(event) => {
                                                                     event.preventDefault();
@@ -882,15 +1159,11 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
 
                                                     {canFullyManageTasks && <button
                                                         type="button"
-                                                        onClick={() => {
-                                                            router.delete(route('tasks.subtasks.destroy', [selectedTask.id, child.id]), {
-                                                                preserveScroll: true,
-                                                            });
-                                                        }}
+                                                        onClick={() => removeDraftSubtask(child.client_key)}
                                                         className="inline-flex items-center gap-2 rounded-2xl border border-stone-700 px-3 py-2 text-xs text-stone-300 transition hover:border-rose-500/40 hover:text-rose-200"
                                                     >
                                                         <FiTrash2 className="h-3.5 w-3.5" />
-                                                        Eliminar
+                                                        Quitar del borrador
                                                     </button>}
                                                 </div>
                                             </div>
@@ -926,12 +1199,12 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
 
                                 <div>
                                     <label className="text-xs uppercase tracking-[0.2em] text-stone-500">Descripción</label>
-                                    <textarea
-                                        rows="6"
-                                        className="mt-2 w-full rounded-3xl border border-stone-700 bg-stone-950 px-4 py-3 text-stone-100"
+                                    <RichTextEditor
+                                        className="mt-2"
                                         value={taskForm.data.description}
-                                        onChange={(event) => taskForm.setData('description', event.target.value)}
+                                        onChange={(nextValue) => taskForm.setData('description', nextValue)}
                                         placeholder="Agrega pasos, contexto, criterios de aceptación o notas para el equipo."
+                                        imageUploadUrl={selectedTask ? route('tasks.attachments.store', selectedTask.id) : null}
                                     />
                                 </div>
 
@@ -1019,11 +1292,10 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
 
                                                         moveTaskDirect(selectedTask.id, column.key);
                                                     }}
-                                                    className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                                                        selectedTask.status === column.key
+                                                    className={`rounded-full px-4 py-2 text-sm font-medium transition ${selectedTask.status === column.key
                                                             ? 'bg-amber-300 text-stone-950'
                                                             : 'border border-stone-700 text-stone-300 hover:border-stone-500'
-                                                    }`}
+                                                        }`}
                                                 >
                                                     {column.label}
                                                 </button>
@@ -1269,11 +1541,10 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                         const files = Array.from(event.dataTransfer.files ?? []);
                                         uploadTaskFiles(files);
                                     }}
-                                    className={`mt-5 rounded-[2rem] border border-dashed px-5 py-8 text-center transition ${
-                                        isAttachmentDragging
+                                    className={`mt-5 rounded-[2rem] border border-dashed px-5 py-8 text-center transition ${isAttachmentDragging
                                             ? 'border-amber-300 bg-amber-300/10 text-amber-200'
                                             : 'border-stone-700 bg-stone-950/60 text-stone-500'
-                                    }`}
+                                        }`}
                                 >
                                     <div className="flex items-center justify-center gap-2 text-stone-200">
                                         <FiPaperclip className="h-4 w-4" />
@@ -1391,61 +1662,64 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                     <form onSubmit={handleCreateTask} className="mt-5 space-y-4 sm:mt-6">
                         <div className="rounded-[1.75rem] border border-[color:var(--border)] bg-[color:var(--bg-surface)]/80 p-4 sm:p-5">
                             <div className="grid gap-4 xl:grid-cols-2">
-                            <AppSelect value={createForm.data.project_id} onChange={(event) => createForm.setData('project_id', event.target.value)}>
-                                {projects.map((project) => (
-                                    <option key={project.id} value={project.id}>
-                                        {project.name}
-                                    </option>
-                                ))}
-                            </AppSelect>
+                                <AppSelect value={createForm.data.project_id} onChange={(event) => createForm.setData('project_id', event.target.value)}>
+                                    {projects.map((project) => (
+                                        <option key={project.id} value={project.id}>
+                                            {project.name}
+                                        </option>
+                                    ))}
+                                </AppSelect>
 
-                            <input
-                                className="theme-input w-full rounded-2xl border px-4 py-3 text-base text-stone-100"
-                                placeholder="Título de la tarea"
-                                value={createForm.data.title}
-                                onChange={(event) => createForm.setData('title', event.target.value)}
-                            />
+                                <input
+                                    className="theme-input w-full rounded-2xl border px-4 py-3 text-base text-stone-100"
+                                    placeholder="Título de la tarea"
+                                    value={createForm.data.title}
+                                    onChange={(event) => createForm.setData('title', event.target.value)}
+                                />
                             </div>
 
-                            <textarea
-                                className="theme-input mt-4 h-32 w-full rounded-2xl border px-4 py-3 text-base text-stone-100"
-                            placeholder="Descripción"
-                            value={createForm.data.description}
-                            onChange={(event) => createForm.setData('description', event.target.value)}
-                            />
+                            <div className="mt-4">
+                                <RichTextEditor
+                                    label="Descripción"
+                                    hint="Puedes usar formato enriquecido. Las imágenes se habilitan cuando la tarea ya existe."
+                                    value={createForm.data.description}
+                                    onChange={(nextValue) => createForm.setData('description', nextValue)}
+                                    placeholder="Descripción"
+                                />
+                            </div>
                         </div>
 
                         <div className="rounded-[1.75rem] border border-[color:var(--border)] bg-[color:var(--bg-surface)]/80 p-4 sm:p-5">
                             <div className="grid gap-4 lg:grid-cols-4">
-                            <AppSelect value={createForm.data.status} onChange={(event) => createForm.setData('status', event.target.value)}>
-                                {columns.map((column) => (
-                                    <option key={column.key} value={column.key}>
-                                        {column.label}
-                                    </option>
-                                ))}
-                            </AppSelect>
+                                <AppSelect value={createForm.data.status} onChange={(event) => createForm.setData('status', event.target.value)}>
+                                    {columns.map((column) => (
+                                        <option key={column.key} value={column.key}>
+                                            {column.label}
+                                        </option>
+                                    ))}
+                                </AppSelect>
 
-                            <AppSelect value={createForm.data.priority} onChange={(event) => createForm.setData('priority', event.target.value)}>
-                                {priorities.map((priority) => (
-                                    <option key={priority} value={priority}>
-                                        {priorityLabels[priority] ?? priority}
-                                    </option>
-                                ))}
-                            </AppSelect>
+                                <AppSelect value={createForm.data.priority} onChange={(event) => createForm.setData('priority', event.target.value)}>
+                                    {priorities.map((priority) => (
+                                        <option key={priority} value={priority}>
+                                            {priorityLabels[priority] ?? priority}
+                                        </option>
+                                    ))}
+                                </AppSelect>
 
-                            <AppDatePicker
-                                className="text-stone-100"
-                                value={createForm.data.start_date}
-                                onChange={(event) => createForm.setData('start_date', event.target.value)}
-                                placeholder="Fecha de inicio"
-                            />
+                                <AppDatePicker
+                                    className="text-stone-100"
+                                    value={createForm.data.start_date}
+                                    onChange={(event) => createForm.setData('start_date', event.target.value)}
+                                    placeholder="Fecha de inicio"
+                                />
 
-                            <AppDatePicker
-                                className="text-stone-100"
-                                value={createForm.data.due_date}
-                                onChange={(event) => createForm.setData('due_date', event.target.value)}
-                                placeholder="Selecciona fecha limite"
-                            />
+                                <AppDatePicker
+                                    className="text-stone-100"
+                                    value={createForm.data.due_date}
+                                    onChange={(event) => createForm.setData('due_date', event.target.value)}
+                                    placeholder="Selecciona fecha limite"
+                                />
                             </div>
                         </div>
 

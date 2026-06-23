@@ -29,6 +29,7 @@ class User extends Authenticatable
         'status',
         'theme_preference',
         'last_login_at',
+        'must_change_password',
     ];
 
     /**
@@ -49,6 +50,7 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'last_login_at' => 'datetime',
+        'must_change_password' => 'boolean',
         'password' => 'hashed',
     ];
 

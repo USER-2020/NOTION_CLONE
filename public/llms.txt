@@ -1,0 +1,25 @@
+# Notion Clone (Prestige Studio)
+
+Notion Clone es un espacio de trabajo colaborativo en tiempo real diseñado para organizar tareas, proyectos, documentación y administración de miembros de forma eficiente.
+
+## Características Principales
+
+- **Espacios de Trabajo**: Creación y administración de múltiples entornos de trabajo personalizados para equipos.
+- **Gestión de Proyectos**: Seguimiento de hitos, estados de tareas (Tableros) y asignación de colaboradores en tiempo real.
+- **Documentación**: Creación y edición de páginas con formato enriquecido (Rich Text Editor).
+- **Gestión de Miembros**: Control granular de roles (Super Admin, Miembro, etc.) y asignación a espacios de trabajo.
+
+## Arquitectura Tecnológica
+
+- **Backend**: Laravel (PHP), PHP Artisan
+- **Frontend**: React (Inertia.js), Tailwind CSS
+- **Diseño Visual**: Paleta premium crema y púrpura con glassmorphism y micro-animaciones responsivas.
+- **PWA**: PWA instalado y configurado con Service Workers automáticos para soporte offline de recursos.
+
+## Estructura de Rutas Clave
+
+- `/dashboard`: Panel de administración principal y resumen de actividad.
+- `/workspaces`: Lista de espacios de trabajo, creación e indexación.
+- `/projects`: Gestión de proyectos y estados de tareas.
+- `/members`: Administración de miembros del equipo, invitaciones y roles del sistema.
+- `/profile`: Ajustes de perfil del usuario, seguridad y sesión activa.

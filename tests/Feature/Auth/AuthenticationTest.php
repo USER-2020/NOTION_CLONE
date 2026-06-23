@@ -31,6 +31,21 @@ class AuthenticationTest extends TestCase
         $response->assertRedirect(RouteServiceProvider::HOME);
     }
 
+    public function test_users_with_required_password_change_are_redirected_to_profile_after_login(): void
+    {
+        $user = User::factory()->create([
+            'must_change_password' => true,
+        ]);
+
+        $response = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $this->assertAuthenticated();
+        $response->assertRedirect(route('profile.edit'));
+    }
+
     public function test_users_can_not_authenticate_with_invalid_password(): void
     {
         $user = User::factory()->create();

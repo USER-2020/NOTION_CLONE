@@ -29,6 +29,14 @@ class StoreTaskRequest extends FormRequest
             'start_date' => ['nullable', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'position' => ['nullable', 'integer', 'min:0'],
+            'subtasks' => ['nullable', 'array'],
+            'subtasks.*.id' => ['nullable', 'integer', 'exists:tasks,id'],
+            'subtasks.*.title' => ['required_with:subtasks', 'string', 'max:255'],
+            'subtasks.*.status' => ['nullable', Rule::in(['todo', 'in_progress', 'done', 'blocked'])],
+            'subtasks.*.assignee_ids' => ['nullable', 'array'],
+            'subtasks.*.assignee_ids.*' => ['integer', 'exists:users,id'],
+            'subtasks.*.start_date' => ['nullable', 'date'],
+            'subtasks.*.due_date' => ['nullable', 'date'],
         ];
     }
 
@@ -46,6 +54,23 @@ class StoreTaskRequest extends FormRequest
             foreach ((array) $this->input('assignee_ids', []) as $assigneeId) {
                 if (! $memberIds->contains((int) $assigneeId)) {
                     $validator->errors()->add('assignee_ids', 'Todos los responsables deben pertenecer al proyecto.');
+                    break;
+                }
+            }
+
+            foreach ((array) $this->input('subtasks', []) as $index => $subtask) {
+                foreach ((array) ($subtask['assignee_ids'] ?? []) as $assigneeId) {
+                    if (! $memberIds->contains((int) $assigneeId)) {
+                        $validator->errors()->add("subtasks.{$index}.assignee_ids", 'Todos los responsables deben pertenecer al proyecto.');
+                        break 2;
+                    }
+                }
+
+                $startDate = $subtask['start_date'] ?? null;
+                $dueDate = $subtask['due_date'] ?? null;
+
+                if ($startDate && $dueDate && $dueDate < $startDate) {
+                    $validator->errors()->add("subtasks.{$index}.due_date", 'La fecha limite debe ser posterior o igual a la fecha de inicio.');
                     break;
                 }
             }

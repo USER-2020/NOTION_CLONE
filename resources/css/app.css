@@ -73,7 +73,7 @@
         --danger-text: #fecdd3;
         --tooltip-bg: rgba(255, 251, 227, 0.96);
         --tooltip-border: rgba(138, 115, 211, 0.4);
-        --tooltip-text: #1b0f47;
+        --tooltip-text: #160b3c;
         color-scheme: dark;
     }
 
@@ -394,6 +394,7 @@
         background-color: var(--tooltip-bg);
         color: var(--tooltip-text);
         backdrop-filter: blur(14px);
+        box-shadow: 0 22px 40px -26px rgba(0, 0, 0, 0.55);
     }
 
     .theme-phone-shell {
@@ -581,4 +582,203 @@
     .border-gray-300 {
         border-color: var(--border) !important;
     }
+}
+
+/* ==========================================================
+   TASKS BOARD - LIGHT MODE
+   Estilo crema / morado / dorado como referencia visual
+   ========================================================== */
+
+:root[data-theme='light'] {
+    --tasks-bg: #f7f2c9;
+    --tasks-bg-soft: #fffdf1;
+    --tasks-panel: rgba(255, 253, 241, 0.94);
+    --tasks-panel-strong: rgba(255, 254, 246, 0.98);
+
+    --tasks-muted-panel: #a6a49f;
+    --tasks-muted-panel-text: #140066;
+
+    --tasks-border: #d8ca78;
+    --tasks-border-soft: rgba(216, 202, 120, 0.78);
+
+    --tasks-primary: #1e0b54;
+    --tasks-secondary: #21106f;
+    --tasks-muted: #6b5ca0;
+
+    --tasks-accent: #7f23ce;
+    --tasks-accent-soft: rgba(127, 35, 206, 0.14);
+    --tasks-accent-light: #eadcf1;
+
+    --tasks-shadow: 0 28px 70px -48px rgba(30, 11, 84, 0.35);
+}
+
+/* Fondo general */
+:root[data-theme='light'] body {
+    background:
+        linear-gradient(180deg, #fffdf1 0%, #faf7d8 45%, #f2edc2 100%) !important;
+    color: var(--tasks-primary) !important;
+}
+
+/* Contenedor principal de Tareas */
+:root[data-theme='light'] .theme-shell,
+:root[data-theme='light'] .theme-backdrop {
+    background:
+        linear-gradient(180deg, #fffdf1 0%, #faf7d8 45%, #f2edc2 100%) !important;
+    color: var(--tasks-primary) !important;
+}
+
+/* Textos principales */
+:root[data-theme='light'] .text-stone-50,
+:root[data-theme='light'] .text-stone-100,
+:root[data-theme='light'] .text-stone-200 {
+    color: var(--tasks-primary) !important;
+}
+
+:root[data-theme='light'] .text-stone-300,
+:root[data-theme='light'] .text-stone-400 {
+    color: var(--tasks-secondary) !important;
+}
+
+:root[data-theme='light'] .text-stone-500 {
+    color: var(--tasks-muted) !important;
+}
+
+/* Iconos/acento morado */
+:root[data-theme='light'] .text-amber-300,
+:root[data-theme='light'] .text-amber-400,
+:root[data-theme='light'] .text-violet-300,
+:root[data-theme='light'] .text-violet-400,
+:root[data-theme='light'] .text-indigo-600,
+:root[data-theme='light'] .text-indigo-700 {
+    color: var(--tasks-accent) !important;
+}
+
+/* Bordes */
+:root[data-theme='light'] .border-stone-800,
+:root[data-theme='light'] .border-stone-700,
+:root[data-theme='light'] .border-stone-600 {
+    border-color: var(--tasks-border-soft) !important;
+}
+
+/* Superficies oscuras convertidas a light */
+:root[data-theme='light'] .bg-\[\#130f19\],
+:root[data-theme='light'] .bg-\[\#15111a\],
+:root[data-theme='light'] .bg-\[\#18131f\],
+:root[data-theme='light'] .bg-\[\#1a1420\],
+:root[data-theme='light'] .bg-\[\#1d1726\],
+:root[data-theme='light'] .bg-stone-950,
+:root[data-theme='light'] .bg-stone-950\/40,
+:root[data-theme='light'] .bg-stone-950\/60,
+:root[data-theme='light'] .bg-stone-950\/70,
+:root[data-theme='light'] .bg-stone-950\/80,
+:root[data-theme='light'] .bg-stone-900,
+:root[data-theme='light'] .bg-stone-900\/60,
+:root[data-theme='light'] .bg-stone-900\/70,
+:root[data-theme='light'] .bg-stone-900\/80 {
+    background-color: var(--tasks-panel) !important;
+}
+
+/* Caja hero del tablero */
+:root[data-theme='light'] section.rounded-\[2\.2rem\] {
+    background: var(--tasks-panel-strong) !important;
+    border-color: var(--tasks-border) !important;
+    box-shadow: var(--tasks-shadow) !important;
+}
+
+/* Header interno del hero */
+:root[data-theme='light'] section.rounded-\[2\.2rem\] > div:first-child {
+    background:
+        radial-gradient(circle at top left, rgba(127, 35, 206, 0.08), transparent 32%),
+        linear-gradient(180deg, rgba(255, 253, 241, 0.98), rgba(255, 253, 241, 0.92)) !important;
+    border-color: var(--tasks-border-soft) !important;
+}
+
+/* Botón crear tarea */
+:root[data-theme='light'] .bg-lime-300,
+:root[data-theme='light'] .hover\:bg-lime-200:hover {
+    background: var(--tasks-accent-light) !important;
+    color: var(--tasks-primary) !important;
+}
+
+/* Caja informativa gris */
+:root[data-theme='light'] .mt-6.rounded-3xl.border.bg-stone-950\/40 {
+    background: var(--tasks-muted-panel) !important;
+    color: var(--tasks-muted-panel-text) !important;
+    border-color: var(--tasks-border) !important;
+}
+
+/* Caja filtro gris */
+:root[data-theme='light'] .mt-5.flex.flex-col.gap-3.rounded-3xl.border.bg-stone-950\/40 {
+    background: var(--tasks-muted-panel) !important;
+    color: var(--tasks-muted-panel-text) !important;
+    border-color: var(--tasks-border) !important;
+}
+
+/* Texto dentro de caja gris */
+:root[data-theme='light'] .mt-5.flex.flex-col.gap-3.rounded-3xl.border.bg-stone-950\/40 p,
+:root[data-theme='light'] .mt-6.rounded-3xl.border.bg-stone-950\/40 {
+    color: var(--tasks-muted-panel-text) !important;
+}
+
+/* Botones del filtro */
+:root[data-theme='light'] .rounded-full.border.border-stone-700 {
+    border-color: #e5d98b !important;
+    color: var(--tasks-primary) !important;
+}
+
+:root[data-theme='light'] .bg-stone-100 {
+    background: rgba(127, 35, 206, 0.16) !important;
+    color: var(--tasks-primary) !important;
+}
+
+/* Columnas Kanban */
+:root[data-theme='light'] section.grid > div.rounded-\[2rem\] {
+    background: var(--tasks-panel-strong) !important;
+    border-color: var(--tasks-border) !important;
+    box-shadow: 0 20px 55px -42px rgba(30, 11, 84, 0.28) !important;
+}
+
+/* Cards de tareas */
+:root[data-theme='light'] .group.rounded-\[1\.4rem\] {
+    background: #fffdf4 !important;
+    border-color: var(--tasks-border-soft) !important;
+    box-shadow: 0 18px 42px -34px rgba(30, 11, 84, 0.25) !important;
+}
+
+:root[data-theme='light'] .group.rounded-\[1\.4rem\]:hover {
+    background: #fffbed !important;
+    border-color: var(--tasks-accent) !important;
+}
+
+/* Drop zone */
+:root[data-theme='light'] .border-dashed {
+    border-color: rgba(216, 202, 120, 0.9) !important;
+    color: var(--tasks-secondary) !important;
+}
+
+/* Pills / badges */
+:root[data-theme='light'] .bg-stone-900,
+:root[data-theme='light'] .bg-stone-800 {
+    background: rgba(255, 253, 241, 0.8) !important;
+    color: var(--tasks-primary) !important;
+}
+
+/* Estados activos */
+:root[data-theme='light'] .bg-amber-300,
+:root[data-theme='light'] .bg-amber-300\/10,
+:root[data-theme='light'] .bg-violet-500\/10 {
+    background-color: var(--tasks-accent-soft) !important;
+    color: var(--tasks-primary) !important;
+}
+
+/* Modal lateral */
+:root[data-theme='light'] aside.bg-stone-950 {
+    background: #fffdf1 !important;
+    border-color: var(--tasks-border) !important;
+    color: var(--tasks-primary) !important;
+}
+
+/* Overlay modal */
+:root[data-theme='light'] .bg-black\/60 {
+    background-color: rgba(30, 11, 84, 0.34) !important;
 }

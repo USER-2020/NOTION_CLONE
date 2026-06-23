@@ -3,9 +3,9 @@ import LogoUploadField from '@/Components/LogoUploadField';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
-import { FiBriefcase, FiCheckCircle, FiEdit3, FiFolder, FiFileText, FiPlusCircle, FiUsers } from 'react-icons/fi';
+import { FiBriefcase, FiCheckCircle, FiEdit3, FiFolder, FiFileText, FiPlusCircle, FiTrash2, FiUsers } from 'react-icons/fi';
 
-function WorkspaceCard({ workspace, isCurrent, onEdit, onSelect }) {
+function WorkspaceCard({ workspace, isCurrent, onDelete, onEdit, onSelect }) {
     return (
         <article className="theme-surface rounded-[2rem] border p-5 shadow-[0_18px_45px_-30px_rgba(101,72,22,0.18)]">
             <div className="flex items-start justify-between gap-3">
@@ -75,14 +75,27 @@ function WorkspaceCard({ workspace, isCurrent, onEdit, onSelect }) {
                     {isCurrent ? 'Seleccionado' : 'Usar este workspace'}
                 </button>
 
-                <button
-                    type="button"
-                    onClick={() => onEdit(workspace)}
-                    className="theme-surface-strong theme-text-secondary inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-medium transition hover:opacity-90"
-                >
-                    <FiEdit3 className="h-4 w-4" />
-                    Editar
-                </button>
+                {onEdit ? (
+                    <button
+                        type="button"
+                        onClick={() => onEdit(workspace)}
+                        className="theme-surface-strong theme-text-secondary inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-medium transition hover:opacity-90"
+                    >
+                        <FiEdit3 className="h-4 w-4" />
+                        Editar
+                    </button>
+                ) : null}
+
+                {onDelete ? (
+                    <button
+                        type="button"
+                        onClick={() => onDelete(workspace)}
+                        className="inline-flex items-center gap-2 rounded-2xl border border-rose-300/40 px-4 py-3 text-sm font-medium text-rose-500 transition hover:bg-rose-500/10"
+                    >
+                        <FiTrash2 className="h-4 w-4" />
+                        Eliminar
+                    </button>
+                ) : null}
             </div>
         </article>
     );
@@ -91,6 +104,9 @@ function WorkspaceCard({ workspace, isCurrent, onEdit, onSelect }) {
 export default function WorkspacesIndex({ workspaces, owners }) {
     const { auth, workspace: workspaceContext } = usePage().props;
     const currentWorkspaceId = workspaceContext?.current?.id ?? null;
+    const canManageWorkspace = auth.roles?.some((role) => ['super_admin', 'admin', 'project_manager'].includes(role));
+    const canUpdateWorkspace = canManageWorkspace;
+    const canDeleteWorkspace = canManageWorkspace;
     const [editingWorkspaceId, setEditingWorkspaceId] = useState(null);
 
     const form = useForm({
@@ -118,10 +134,16 @@ export default function WorkspacesIndex({ workspaces, owners }) {
         event.preventDefault();
 
         if (editingWorkspaceId) {
-            form.patch(route('workspaces.update', editingWorkspaceId), {
+            form.transform((data) => ({
+                ...data,
+                _method: 'patch',
+            }));
+
+            form.post(route('workspaces.update', editingWorkspaceId), {
                 forceFormData: true,
                 preserveScroll: true,
                 onSuccess: () => setEditingWorkspaceId(null),
+                onFinish: () => form.transform((data) => data),
             });
 
             return;
@@ -147,6 +169,21 @@ export default function WorkspacesIndex({ workspaces, owners }) {
 
     function handleSelect(workspaceId) {
         router.patch(route('workspaces.switch'), { workspace_id: workspaceId }, { preserveScroll: true, preserveState: false });
+    }
+
+    function handleDelete(workspace) {
+        if (!window.confirm(`Vas a eliminar el workspace "${workspace.name}". Esta accion no se puede deshacer.`)) {
+            return;
+        }
+
+        router.delete(route('workspaces.destroy', workspace.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                if (editingWorkspaceId === workspace.id) {
+                    setEditingWorkspaceId(null);
+                }
+            },
+        });
     }
 
     return (
@@ -177,13 +214,15 @@ export default function WorkspacesIndex({ workspaces, owners }) {
                                 key={workspace.id}
                                 workspace={workspace}
                                 isCurrent={currentWorkspaceId === workspace.id}
-                                onEdit={handleEdit}
+                                onDelete={canDeleteWorkspace ? handleDelete : null}
+                                onEdit={canUpdateWorkspace ? handleEdit : null}
                                 onSelect={handleSelect}
                             />
                         ))}
                     </div>
                 </section>
 
+                {canUpdateWorkspace ? (
                 <section className="theme-surface rounded-[2rem] border p-6 shadow-[0_18px_45px_-30px_rgba(101,72,22,0.22)]">
                     <div className="flex items-center gap-3">
                         <div className="theme-muted flex h-12 w-12 items-center justify-center rounded-2xl">
@@ -272,6 +311,7 @@ export default function WorkspacesIndex({ workspaces, owners }) {
                         </div>
                     </form>
                 </section>
+                ) : null}
             </div>
         </AuthenticatedLayout>
     );

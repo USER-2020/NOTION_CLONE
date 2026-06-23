@@ -27,7 +27,7 @@ class ProjectController extends Controller
                 ->visibleForUser($request->user())
                 ->when($currentWorkspace, fn ($query) => $query->where('workspace_id', $currentWorkspace->id))
                 ->with([
-                    'workspace:id,name',
+                    'workspace:id,name,logo_path',
                     'owner:id,name',
                     'members' => fn ($query) => $query->select('users.id', 'name')->orderBy('name'),
                     'tasks' => fn ($query) => $query
@@ -98,7 +98,7 @@ class ProjectController extends Controller
         $this->authorize('view', $project);
 
         $project->load([
-            'workspace:id,name',
+            'workspace:id,name,logo_path',
             'owner:id,name',
             'members' => fn ($query) => $query->select('users.id', 'name')->orderBy('name'),
             'pages' => fn ($query) => $query
@@ -113,7 +113,11 @@ class ProjectController extends Controller
             'project' => [
                 'id' => $project->id,
                 'workspace_id' => $project->workspace_id,
-                'workspace' => $project->workspace,
+                'workspace' => $project->workspace ? [
+                    'id' => $project->workspace->id,
+                    'name' => $project->workspace->name,
+                    'logo_url' => $project->workspace->logo_path ? Storage::disk('public')->url($project->workspace->logo_path) : null,
+                ] : null,
                 'owner_id' => $project->owner_id,
                 'owner' => $project->owner,
                 'name' => $project->name,
@@ -186,6 +190,10 @@ class ProjectController extends Controller
     public function destroy(Project $project): RedirectResponse
     {
         $this->authorize('delete', $project);
+
+        if ($project->logo_path) {
+            Storage::disk('public')->delete($project->logo_path);
+        }
 
         $project->delete();
 

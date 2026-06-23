@@ -4,13 +4,28 @@ import BrandLogo from '@/Components/BrandLogo';
 import axios from 'axios';
 import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
-import { FiBookOpen, FiBriefcase, FiGrid, FiLayers, FiLogOut, FiMenu, FiMoon, FiSettings, FiSun, FiUser, FiUsers, FiX } from 'react-icons/fi';
+import {
+    FiBookOpen,
+    FiBriefcase,
+    FiChevronLeft,
+    FiChevronRight,
+    FiGrid,
+    FiLayers,
+    FiLogOut,
+    FiMenu,
+    FiMoon,
+    FiSettings,
+    FiSun,
+    FiUser,
+    FiUsers,
+    FiX,
+} from 'react-icons/fi';
 
 const baseNavItems = [
-    { label: 'Panel', href: 'dashboard', match: 'dashboard', icon: FiGrid },
-    { label: 'Proyectos', href: 'projects.index', match: 'projects.', icon: FiBriefcase },
-    { label: 'Tareas', href: 'tasks.index', match: 'tasks.', icon: FiLayers },
-    { label: 'Documentacion', href: 'documentation.index', match: 'documentation', icon: FiBookOpen },
+    { label: 'Panel', href: 'dashboard', match: 'dashboard', icon: FiGrid, description: 'Resumen general, actividad reciente y accesos rapidos del workspace.' },
+    { label: 'Proyectos', href: 'projects.index', match: 'projects.', icon: FiBriefcase, description: 'Organiza proyectos, logos, fechas, miembros y avances del equipo.' },
+    { label: 'Tareas', href: 'tasks.index', match: 'tasks.', icon: FiLayers, description: 'Gestiona tareas, subtareas, responsables, fechas y estados.' },
+    { label: 'Documentacion', href: 'documentation.index', match: 'documentation', icon: FiBookOpen, description: 'Consulta o crea paginas internas, procesos y notas compartidas.' },
 ];
 
 const themes = [
@@ -23,15 +38,31 @@ function clsx(...values) {
     return values.filter(Boolean).join(' ');
 }
 
+function isNavItemActive(url, item) {
+    return url.startsWith(`/${item.match.split('.')[0]}`) || route().current(item.match + '*');
+}
+
 function buildNavItems(permissions = []) {
     const items = [...baseNavItems];
 
     if (permissions.includes('workspaces.view')) {
-        items.push({ label: 'Espacios', href: 'workspaces.index', match: 'workspaces.', icon: FiBriefcase });
+        items.push({
+            label: 'Espacios',
+            href: 'workspaces.index',
+            match: 'workspaces.',
+            icon: FiBriefcase,
+            description: 'Administra workspaces visibles, cambia el espacio activo y revisa sus logos.',
+        });
     }
 
     if (permissions.includes('users.manage')) {
-        items.push({ label: 'Miembros', href: 'users.index', match: 'users.', icon: FiUsers });
+        items.push({
+            label: 'Miembros',
+            href: 'users.index',
+            match: 'users.',
+            icon: FiUsers,
+            description: 'Invita personas, ajusta permisos y controla el acceso al equipo.',
+        });
     }
 
     return items;
@@ -153,6 +184,122 @@ function SidebarFooter({ user }) {
     );
 }
 
+function DesktopSidebarPanel({ item, currentWorkspace, updateTheme, themePreference, user }) {
+    if (!item) {
+        return null;
+    }
+
+    const panelClassName = 'w-[min(22rem,calc(100vw-8.5rem))] rounded-[1.9rem] border theme-border theme-surface-strong p-5 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.35)]';
+
+    if (item.kind === 'workspace') {
+        return (
+            <div className={panelClassName}>
+                <p className="theme-text-muted text-[11px] uppercase tracking-[0.32em]">Workspace</p>
+                <div className="mt-3 flex items-center gap-3">
+                    {currentWorkspace?.logo_url ? (
+                        <img src={currentWorkspace.logo_url} alt={currentWorkspace.name} className="h-12 w-12 rounded-2xl object-cover" />
+                    ) : (
+                        <div className="theme-surface flex h-12 w-12 items-center justify-center rounded-2xl border text-sm font-semibold">
+                            {(currentWorkspace?.name ?? 'WS').slice(0, 2)}
+                        </div>
+                    )}
+                    <div className="min-w-0">
+                        <p className="theme-text-primary truncate text-base font-semibold">{currentWorkspace?.name ?? 'Workspace activo'}</p>
+                        <p className="theme-text-secondary mt-1 text-sm">Accesos rapidos del espacio de trabajo.</p>
+                    </div>
+                </div>
+                <div className="mt-4 grid gap-2">
+                    <Link href={route('dashboard')} className="theme-surface theme-text-secondary rounded-2xl border px-4 py-3 text-sm transition hover:opacity-90">
+                        Ir al panel
+                    </Link>
+                    <Link href={route('workspaces.index')} className="theme-surface theme-text-secondary rounded-2xl border px-4 py-3 text-sm transition hover:opacity-90">
+                        Ver espacios
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
+    if (item.kind === 'theme') {
+        return (
+            <div className={panelClassName}>
+                <p className="theme-text-muted text-[11px] uppercase tracking-[0.32em]">Tema</p>
+                <p className="theme-text-primary mt-3 text-base font-semibold">Ajusta la apariencia</p>
+                <div className="mt-4 grid gap-2">
+                    {themes.map((theme) => {
+                        const Icon = theme.icon;
+                        const active = themePreference === theme.value;
+
+                        return (
+                            <button
+                                key={theme.value}
+                                type="button"
+                                onClick={() => updateTheme(theme.value)}
+                                className={clsx(
+                                    'flex items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm transition',
+                                    active ? 'theme-button-accent' : 'theme-surface theme-text-secondary hover:opacity-90'
+                                )}
+                            >
+                                <span className={clsx('flex h-10 w-10 items-center justify-center rounded-xl border', active ? 'border-white/30 bg-white/15' : 'theme-border')}>
+                                    <Icon className="h-4 w-4" />
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                    <span className="block font-medium">{theme.label}</span>
+                                    <span className={clsx('mt-1 block text-xs', active ? 'text-white/75' : 'theme-text-muted')}>{theme.description}</span>
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    }
+
+    if (item.kind === 'profile') {
+        return (
+            <div className={panelClassName}>
+                <p className="theme-text-muted text-[11px] uppercase tracking-[0.32em]">Sesion</p>
+                <p className="theme-text-primary mt-3 truncate text-lg font-semibold">{user.name}</p>
+                <p className="theme-text-secondary mt-1 truncate text-sm">{user.email}</p>
+                <div className="mt-4 grid gap-2">
+                    <Link href={route('profile.edit')} className="theme-surface theme-text-secondary rounded-2xl border px-4 py-3 text-sm transition hover:opacity-90">
+                        Abrir perfil
+                    </Link>
+                    <Link href={route('logout')} method="post" as="button" className="theme-button-accent rounded-2xl px-4 py-3 text-left text-sm font-medium transition">
+                        Cerrar sesion
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
+    const Icon = item.icon;
+
+    return (
+        <div className={panelClassName}>
+            <div className="flex items-start gap-3">
+                <span className="theme-surface flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border">
+                    <Icon className="theme-accent h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                    <p className="theme-text-primary text-base font-semibold">{item.label}</p>
+                    <p className="theme-text-secondary mt-2 text-sm leading-6">{item.description}</p>
+                </div>
+            </div>
+            <div className="mt-4 grid gap-2">
+                <Link href={route(item.href)} className="theme-button-accent rounded-2xl px-4 py-3 text-sm font-medium transition">
+                    Abrir {item.label.toLowerCase()}
+                </Link>
+                {(item.relatedLinks ?? []).map((related) => (
+                    <Link key={related.href} href={route(related.href)} className="theme-surface theme-text-secondary rounded-2xl border px-4 py-3 text-sm transition hover:opacity-90">
+                        {related.label}
+                    </Link>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 function SidebarContent({
     user,
     themePreference,
@@ -162,10 +309,12 @@ function SidebarContent({
     currentWorkspace,
     availableWorkspaces,
     closeMobileMenu = null,
+    showBrandHeader = true,
+    showFooter = true,
 }) {
     return (
         <div className="flex h-full min-h-0 flex-col">
-            <div className="flex items-center justify-between px-6 py-6">
+            {showBrandHeader ? <div className="flex items-center justify-between px-6 py-6">
                 <div className="min-w-0">
                     <p className="theme-accent text-xs uppercase tracking-[0.35em]">Espacio de trabajo</p>
                     <Link href="/" className="mt-3 inline-flex max-w-full">
@@ -195,12 +344,12 @@ function SidebarContent({
                         <FiX className="h-5 w-5" />
                     </button>
                 )}
-            </div>
+            </div> : null}
 
             <div className="flex-1 overflow-y-auto px-4 pb-4">
                 <nav className="space-y-2">
                     {navItems.map((item) => {
-                        const active = url.startsWith(`/${item.match.split('.')[0]}`) || route().current(item.match + '*');
+                        const active = isNavItemActive(url, item);
                         const Icon = item.icon;
 
                         return (
@@ -227,16 +376,227 @@ function SidebarContent({
                 </div>
             </div>
 
-            <div className="shrink-0 border-t theme-border">
-                <SidebarFooter user={user} />
-            </div>
+            {showFooter ? (
+                <div className="shrink-0 border-t theme-border">
+                    <SidebarFooter user={user} />
+                </div>
+            ) : null}
         </div>
+    );
+}
+
+function DesktopSidebar({
+    user,
+    themePreference,
+    updateTheme,
+    url,
+    navItems,
+    currentWorkspace,
+    availableWorkspaces,
+    collapsed,
+    onToggleCollapse,
+}) {
+    const [hoveredItem, setHoveredItem] = useState(null);
+    const [panelTop, setPanelTop] = useState(20);
+    const sidebarRef = useRef(null);
+
+    const workspaceItem = {
+        kind: 'workspace',
+        key: 'workspace',
+        label: currentWorkspace?.name ?? 'Workspace',
+    };
+    const themeItem = { kind: 'theme', key: 'theme', label: 'Tema', icon: themePreference === 'dark' ? FiMoon : FiSun };
+    const profileItem = { kind: 'profile', key: 'profile', label: 'Perfil' };
+
+    const navItemsWithRelated = navItems.map((item) => ({
+        ...item,
+        relatedLinks: navItems
+            .filter((candidate) => candidate.href !== item.href)
+            .slice(0, 2)
+            .map((candidate) => ({ label: candidate.label, href: candidate.href })),
+    }));
+
+    useEffect(() => {
+        if (!collapsed) {
+            setHoveredItem(null);
+        }
+    }, [collapsed]);
+
+    function openHoverPanel(item, target) {
+        if (!sidebarRef.current || !target) {
+            setHoveredItem(item);
+            return;
+        }
+
+        const sidebarRect = sidebarRef.current.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        const estimatedPanelHeight = item?.kind === 'theme' ? 320 : 240;
+        const maxTop = Math.max(20, window.innerHeight - sidebarRect.top - estimatedPanelHeight - 24);
+        const nextTop = Math.min(maxTop, Math.max(20, targetRect.top - sidebarRect.top - 14));
+
+        setPanelTop(nextTop);
+        setHoveredItem(item);
+    }
+
+    return (
+        <aside
+            className={clsx(
+                'theme-surface theme-border fixed inset-y-0 left-0 z-30 hidden border-r backdrop-blur lg:block',
+                collapsed ? 'w-[104px]' : 'w-[300px]'
+            )}
+        >
+            <div
+                ref={sidebarRef}
+                className="relative flex h-full min-h-0"
+                onMouseLeave={() => setHoveredItem(null)}
+            >
+                {collapsed ? (
+                    <div className="flex h-full w-full min-h-0 flex-col items-center px-4 py-5">
+                        <button
+                            type="button"
+                            onClick={onToggleCollapse}
+                            className="theme-surface theme-border mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl border transition hover:opacity-90"
+                            aria-label="Expandir sidebar"
+                        >
+                            <FiChevronRight className="h-5 w-5" />
+                        </button>
+
+                        <button
+                            type="button"
+                            onMouseEnter={(event) => openHoverPanel(workspaceItem, event.currentTarget)}
+                            onFocus={(event) => openHoverPanel(workspaceItem, event.currentTarget)}
+                            className="theme-surface theme-border inline-flex h-14 w-14 items-center justify-center overflow-hidden rounded-[1.4rem] border transition hover:opacity-90"
+                            aria-label="Workspace"
+                        >
+                            {currentWorkspace?.logo_url ? (
+                                <img src={currentWorkspace.logo_url} alt={currentWorkspace.name} className="h-full w-full object-cover" />
+                            ) : (
+                                <span className="theme-text-primary text-sm font-semibold">
+                                    {(currentWorkspace?.name ?? 'WS').slice(0, 2)}
+                                </span>
+                            )}
+                        </button>
+
+                        <nav className="mt-6 flex flex-1 flex-col items-center gap-3">
+                            {navItemsWithRelated.map((item) => {
+                                const active = isNavItemActive(url, item);
+                                const Icon = item.icon;
+
+                                return (
+                                    <Link
+                                        key={item.href}
+                                        href={route(item.href)}
+                                        onMouseEnter={(event) => openHoverPanel(item, event.currentTarget)}
+                                        onFocus={(event) => openHoverPanel(item, event.currentTarget)}
+                                        className={clsx(
+                                            'inline-flex h-14 w-14 items-center justify-center rounded-[1.4rem] border transition',
+                                            active
+                                                ? 'theme-button-accent border-transparent shadow-[0_18px_35px_-20px_rgba(127,35,206,0.55)]'
+                                                : 'theme-surface theme-border theme-text-secondary hover:opacity-90'
+                                        )}
+                                    >
+                                        <Icon className="h-5 w-5" />
+                                    </Link>
+                                );
+                            })}
+                        </nav>
+
+                        <div className="mt-4 flex flex-col items-center gap-3">
+                            <button
+                                type="button"
+                                onMouseEnter={(event) => openHoverPanel(themeItem, event.currentTarget)}
+                                onFocus={(event) => openHoverPanel(themeItem, event.currentTarget)}
+                                className="theme-surface theme-border inline-flex h-12 w-12 items-center justify-center rounded-2xl border transition hover:opacity-90"
+                                aria-label="Tema"
+                            >
+                                {themePreference === 'dark' ? <FiMoon className="h-4 w-4" /> : <FiSun className="h-4 w-4" />}
+                            </button>
+                            <button
+                                type="button"
+                                onMouseEnter={(event) => openHoverPanel(profileItem, event.currentTarget)}
+                                onFocus={(event) => openHoverPanel(profileItem, event.currentTarget)}
+                                className="theme-surface theme-border inline-flex h-12 w-12 items-center justify-center rounded-2xl border text-sm font-semibold transition hover:opacity-90"
+                                aria-label="Perfil"
+                            >
+                                {user.name?.slice(0, 1)}
+                            </button>
+                        </div>
+
+                        {hoveredItem ? (
+                            <div
+                                className="absolute left-full z-40 pl-3"
+                                style={{ top: `${panelTop}px` }}
+                                onMouseEnter={() => setHoveredItem(hoveredItem)}
+                            >
+                                <div className="absolute inset-y-0 -left-3 w-3" />
+                                <div className="relative">
+                                    <DesktopSidebarPanel
+                                        item={hoveredItem}
+                                        currentWorkspace={currentWorkspace}
+                                        updateTheme={updateTheme}
+                                        themePreference={themePreference}
+                                        user={user}
+                                    />
+                                </div>
+                            </div>
+                        ) : null}
+                    </div>
+                ) : (
+                    <div className="flex h-full w-full min-h-0 flex-col">
+                        <div className="flex items-center justify-between px-6 py-5">
+                            <div className="min-w-0">
+                                <p className="theme-accent text-xs uppercase tracking-[0.35em]">Espacio de trabajo</p>
+                                <Link href="/" className="mt-3 inline-flex max-w-full">
+                                    <BrandLogo compact imageClassName="max-h-10 max-w-[180px]" />
+                                </Link>
+                                <div className="mt-3 flex items-center gap-3">
+                                    {currentWorkspace?.logo_url ? (
+                                        <img src={currentWorkspace.logo_url} alt={currentWorkspace.name} className="h-10 w-10 rounded-2xl object-cover" />
+                                    ) : (
+                                        <div className="theme-surface flex h-10 w-10 items-center justify-center rounded-2xl border text-xs font-semibold">
+                                            {(currentWorkspace?.name ?? 'WS').slice(0, 2)}
+                                        </div>
+                                    )}
+                                    <div className="min-w-0">
+                                        <p className="theme-text-primary truncate text-base font-semibold">
+                                            {currentWorkspace?.name ?? 'SmartSend Workspace'}
+                                        </p>
+                                        <p className="theme-text-muted truncate text-xs uppercase tracking-[0.24em]">Sidebar extendida</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={onToggleCollapse}
+                                className="theme-surface theme-border inline-flex h-11 w-11 items-center justify-center rounded-2xl border transition hover:opacity-90"
+                                aria-label="Colapsar sidebar"
+                            >
+                                <FiChevronLeft className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        <SidebarContent
+                            user={user}
+                            themePreference={themePreference}
+                            updateTheme={updateTheme}
+                            url={url}
+                            navItems={navItems}
+                            currentWorkspace={currentWorkspace}
+                            availableWorkspaces={availableWorkspaces}
+                            showBrandHeader={false}
+                        />
+                    </div>
+                )}
+            </div>
+        </aside>
     );
 }
 
 export default function AuthenticatedLayout({ user, header, children }) {
     const { url, props } = usePage();
     const [themePreference, setThemePreference] = useState('system');
+    const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
     const [mobileNavVisible, setMobileNavVisible] = useState(true);
     const lastScrollY = useRef(0);
@@ -271,6 +631,11 @@ export default function AuthenticatedLayout({ user, header, children }) {
             return undefined;
         }
 
+        const persistedDesktopSidebarState = window.localStorage.getItem('desktop-sidebar-collapsed');
+        if (persistedDesktopSidebarState !== null) {
+            setDesktopSidebarCollapsed(persistedDesktopSidebarState === 'true');
+        }
+
         lastScrollY.current = window.scrollY;
 
         const handleScroll = () => {
@@ -301,6 +666,14 @@ export default function AuthenticatedLayout({ user, header, children }) {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        window.localStorage.setItem('desktop-sidebar-collapsed', desktopSidebarCollapsed ? 'true' : 'false');
+    }, [desktopSidebarCollapsed]);
+
     function updateTheme(value) {
         if (value === themePreference) {
             return;
@@ -323,12 +696,16 @@ export default function AuthenticatedLayout({ user, header, children }) {
         });
     }
 
+    function toggleDesktopSidebar() {
+        setDesktopSidebarCollapsed((currentValue) => !currentValue);
+    }
+
     return (
         <div className="theme-shell min-h-screen">
             <AppToaster />
             <div className="theme-backdrop fixed inset-0" />
 
-            <div className="relative min-h-screen overflow-x-clip lg:pl-[280px]">
+            <div className={clsx('relative min-h-screen overflow-x-clip transition-[padding] duration-300', desktopSidebarCollapsed ? 'lg:pl-[104px]' : 'lg:pl-[300px]')}>
                 <div
                     className={clsx(
                         'fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition lg:hidden',
@@ -356,17 +733,17 @@ export default function AuthenticatedLayout({ user, header, children }) {
                     />
                 </aside>
 
-                <aside className="theme-surface theme-border fixed inset-y-0 left-0 z-30 hidden w-[280px] overflow-hidden border-r backdrop-blur lg:block">
-                    <SidebarContent
-                        user={user}
-                        themePreference={themePreference}
-                        updateTheme={updateTheme}
-                        url={url}
-                        navItems={navItems}
-                        currentWorkspace={currentWorkspace}
-                        availableWorkspaces={availableWorkspaces}
-                    />
-                </aside>
+                <DesktopSidebar
+                    user={user}
+                    themePreference={themePreference}
+                    updateTheme={updateTheme}
+                    url={url}
+                    navItems={navItems}
+                    currentWorkspace={currentWorkspace}
+                    availableWorkspaces={availableWorkspaces}
+                    collapsed={desktopSidebarCollapsed}
+                    onToggleCollapse={toggleDesktopSidebar}
+                />
 
                 <div className="theme-phone-shell relative flex min-h-screen min-w-0 flex-col lg:w-full">
                     <header className="theme-surface sticky top-0 z-30 overflow-x-clip border-b px-4 py-4 backdrop-blur lg:hidden">

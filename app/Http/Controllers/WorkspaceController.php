@@ -157,6 +157,25 @@ class WorkspaceController extends Controller
         return back()->with('success', 'Espacio de trabajo cambiado.');
     }
 
+    public function destroy(Request $request, Workspace $workspace): RedirectResponse
+    {
+        $this->authorize('delete', $workspace);
+
+        if ($workspace->logo_path) {
+            Storage::disk('public')->delete($workspace->logo_path);
+        }
+
+        $wasCurrentWorkspace = (int) $request->session()->get('current_workspace_id') === $workspace->id;
+
+        $workspace->delete();
+
+        if ($wasCurrentWorkspace) {
+            $request->session()->forget('current_workspace_id');
+        }
+
+        return to_route('workspaces.index')->with('success', 'Espacio de trabajo eliminado correctamente.');
+    }
+
     private function uniqueSlug(string $name, ?int $ignoreWorkspaceId = null): string
     {
         $baseSlug = Str::slug($name);

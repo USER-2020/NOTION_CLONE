@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { FiCalendar, FiChevronDown, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 
 function clsx(...values) {
@@ -109,12 +110,64 @@ export default function AppDatePicker({
     const maxValue = useMemo(() => max ?? null, [max]);
     const [open, setOpen] = useState(false);
     const [viewDate, setViewDate] = useState(selectedDate ?? new Date());
+    const [popoverStyles, setPopoverStyles] = useState(null);
 
     useEffect(() => {
         if (selectedDate) {
             setViewDate(selectedDate);
         }
     }, [selectedDate]);
+
+    useEffect(() => {
+        if (!open) {
+            return;
+        }
+
+        function updatePopoverPosition() {
+            const trigger = rootRef.current?.querySelector('button');
+
+            if (!trigger) {
+                return;
+            }
+
+            const rect = trigger.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            const popoverWidth = Math.min(320, Math.max(260, viewportWidth - 32));
+            const popoverHeight = 420;
+            const spacing = 10;
+
+            const preferredLeft = align === 'end'
+                ? rect.right - popoverWidth
+                : rect.left;
+            const clampedLeft = Math.min(
+                Math.max(16, preferredLeft),
+                Math.max(16, viewportWidth - popoverWidth - 16)
+            );
+
+            const spaceBelow = viewportHeight - rect.bottom;
+            const shouldOpenUpward = spaceBelow < popoverHeight && rect.top > spaceBelow;
+            const top = shouldOpenUpward
+                ? Math.max(16, rect.top - popoverHeight - spacing)
+                : Math.min(viewportHeight - popoverHeight - 16, rect.bottom + spacing);
+
+            setPopoverStyles({
+                left: clampedLeft,
+                top,
+                width: popoverWidth,
+            });
+        }
+
+        updatePopoverPosition();
+
+        window.addEventListener('resize', updatePopoverPosition);
+        window.addEventListener('scroll', updatePopoverPosition, true);
+
+        return () => {
+            window.removeEventListener('resize', updatePopoverPosition);
+            window.removeEventListener('scroll', updatePopoverPosition, true);
+        };
+    }, [align, open]);
 
     useEffect(() => {
         function handlePointerDown(event) {
@@ -182,12 +235,8 @@ export default function AppDatePicker({
         handleSelect(today);
     }
 
-    const popoverAlignment = align === 'end'
-        ? 'right-0 left-auto'
-        : 'left-0 right-auto';
-
     return (
-        <div ref={rootRef} className={clsx('relative', wrapperClassName)}>
+        <div ref={rootRef} className={clsx('relative min-w-0', wrapperClassName)}>
             {name ? <input type="hidden" name={name} value={value ?? ''} /> : null}
 
             <button
@@ -198,8 +247,8 @@ export default function AppDatePicker({
                 aria-expanded={open}
                 onClick={() => !disabled && setOpen((current) => !current)}
                 className={clsx(
-                    'theme-date-trigger theme-input flex min-h-12 w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-medium transition',
-                    disabled && 'cursor-not-allowed opacity-70',
+                    'theme-date-trigger theme-input flex min-h-12 w-full min-w-0 items-center justify-between gap-3 overflow-hidden rounded-2xl border px-4 py-3 text-left text-sm font-medium transition',
+                    disabled && 'cursor-not-allowed opacity-100 brightness-90 saturate-75',
                     className
                 )}
             >
@@ -216,96 +265,99 @@ export default function AppDatePicker({
                 </span>
             </button>
 
-            {open ? (
-                <div
-                    className={clsx(
-                        'theme-date-popover absolute top-[calc(100%+0.6rem)] z-50 w-[min(100vw-2rem,20rem)] overflow-hidden rounded-[1.35rem] border shadow-[0_30px_60px_-30px_rgba(15,23,42,0.55)]',
-                        popoverAlignment,
-                        popoverClassName
-                    )}
-                >
-                    <div className="p-3">
-                        <div className="mb-3 flex items-center justify-between gap-2">
-                            <button
-                                type="button"
-                                onClick={() => setViewDate((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}
-                                className="theme-date-nav inline-flex h-9 w-9 items-center justify-center rounded-xl border transition"
-                                aria-label="Mes anterior"
-                            >
-                                <FiChevronLeft className="h-4 w-4" />
-                            </button>
+            {open && popoverStyles && typeof document !== 'undefined'
+                ? createPortal(
+                    <div
+                        className={clsx(
+                            'theme-date-popover fixed z-[90] overflow-hidden rounded-[1.35rem] border shadow-[0_30px_60px_-30px_rgba(15,23,42,0.55)]',
+                            popoverClassName
+                        )}
+                        style={popoverStyles}
+                    >
+                        <div className="p-3">
+                            <div className="mb-3 flex items-center justify-between gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setViewDate((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}
+                                    className="theme-date-nav inline-flex h-9 w-9 items-center justify-center rounded-xl border transition"
+                                    aria-label="Mes anterior"
+                                >
+                                    <FiChevronLeft className="h-4 w-4" />
+                                </button>
 
-                            <div className="text-center">
-                                <p className="theme-text-primary text-sm font-semibold capitalize">
-                                    {new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric' }).format(viewDate)}
-                                </p>
+                                <div className="text-center">
+                                    <p className="theme-text-primary text-sm font-semibold capitalize">
+                                        {new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric' }).format(viewDate)}
+                                    </p>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setViewDate((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}
+                                    className="theme-date-nav inline-flex h-9 w-9 items-center justify-center rounded-xl border transition"
+                                    aria-label="Mes siguiente"
+                                >
+                                    <FiChevronRight className="h-4 w-4" />
+                                </button>
                             </div>
 
-                            <button
-                                type="button"
-                                onClick={() => setViewDate((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}
-                                className="theme-date-nav inline-flex h-9 w-9 items-center justify-center rounded-xl border transition"
-                                aria-label="Mes siguiente"
-                            >
-                                <FiChevronRight className="h-4 w-4" />
-                            </button>
+                            <div className="mb-2 grid grid-cols-7 gap-1 px-1">
+                                {['LU', 'MA', 'MI', 'JU', 'VI', 'SA', 'DO'].map((day) => (
+                                    <span key={day} className="theme-text-muted flex h-8 items-center justify-center text-[11px] font-semibold tracking-[0.18em]">
+                                        {day}
+                                    </span>
+                                ))}
+                            </div>
+
+                            <div className="grid grid-cols-7 gap-1">
+                                {days.map(({ date, inCurrentMonth }) => {
+                                    const nextValue = formatValue(date);
+                                    const isSelected = selectedDate ? isSameDay(date, selectedDate) : false;
+                                    const isToday = isSameDay(date, today);
+                                    const isDisabled = !isWithinRange(nextValue, minValue, maxValue);
+
+                                    return (
+                                        <button
+                                            key={nextValue}
+                                            type="button"
+                                            disabled={isDisabled}
+                                            onClick={() => handleSelect(date)}
+                                            className={clsx(
+                                                'theme-date-day flex h-10 items-center justify-center rounded-xl text-sm font-medium transition',
+                                                !inCurrentMonth && 'theme-date-day-muted',
+                                                isToday && 'theme-date-day-today',
+                                                isSelected && 'theme-date-day-selected',
+                                                isDisabled && 'cursor-not-allowed opacity-35'
+                                            )}
+                                        >
+                                            {date.getDate()}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="mt-3 flex items-center justify-between gap-2 border-t border-[color:var(--border)] pt-3">
+                                <button
+                                    type="button"
+                                    onClick={handleClear}
+                                    className="theme-text-secondary rounded-xl px-3 py-2 text-sm font-medium transition hover:bg-[color:var(--accent-soft)] hover:text-[color:var(--accent)]"
+                                >
+                                    Borrar
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={handleToday}
+                                    className="theme-text-secondary rounded-xl px-3 py-2 text-sm font-medium transition hover:bg-[color:var(--accent-soft)] hover:text-[color:var(--accent)]"
+                                >
+                                    Hoy
+                                </button>
+                            </div>
                         </div>
-
-                        <div className="mb-2 grid grid-cols-7 gap-1 px-1">
-                            {['LU', 'MA', 'MI', 'JU', 'VI', 'SA', 'DO'].map((day) => (
-                                <span key={day} className="theme-text-muted flex h-8 items-center justify-center text-[11px] font-semibold tracking-[0.18em]">
-                                    {day}
-                                </span>
-                            ))}
-                        </div>
-
-                        <div className="grid grid-cols-7 gap-1">
-                            {days.map(({ date, inCurrentMonth }) => {
-                                const nextValue = formatValue(date);
-                                const isSelected = selectedDate ? isSameDay(date, selectedDate) : false;
-                                const isToday = isSameDay(date, today);
-                                const isDisabled = !isWithinRange(nextValue, minValue, maxValue);
-
-                                return (
-                                    <button
-                                        key={nextValue}
-                                        type="button"
-                                        disabled={isDisabled}
-                                        onClick={() => handleSelect(date)}
-                                        className={clsx(
-                                            'theme-date-day flex h-10 items-center justify-center rounded-xl text-sm font-medium transition',
-                                            !inCurrentMonth && 'theme-date-day-muted',
-                                            isToday && 'theme-date-day-today',
-                                            isSelected && 'theme-date-day-selected',
-                                            isDisabled && 'cursor-not-allowed opacity-35'
-                                        )}
-                                    >
-                                        {date.getDate()}
-                                    </button>
-                                );
-                            })}
-                        </div>
-
-                        <div className="mt-3 flex items-center justify-between gap-2 border-t border-[color:var(--border)] pt-3">
-                            <button
-                                type="button"
-                                onClick={handleClear}
-                                className="theme-text-secondary rounded-xl px-3 py-2 text-sm font-medium transition hover:bg-[color:var(--accent-soft)] hover:text-[color:var(--accent)]"
-                            >
-                                Borrar
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={handleToday}
-                                className="theme-text-secondary rounded-xl px-3 py-2 text-sm font-medium transition hover:bg-[color:var(--accent-soft)] hover:text-[color:var(--accent)]"
-                            >
-                                Hoy
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            ) : null}
+                    </div>,
+                    document.body
+                )
+                : null}
         </div>
     );
 }

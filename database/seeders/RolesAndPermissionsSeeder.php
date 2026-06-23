@@ -20,6 +20,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'workspaces.view',
             'workspaces.create',
             'workspaces.update',
+            'workspaces.delete',
             'projects.view',
             'projects.create',
             'projects.update',
@@ -43,6 +44,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'project_manager' => [
                 'dashboard.view',
                 'workspaces.view',
+                'workspaces.update',
+                'workspaces.delete',
                 'projects.view',
                 'projects.create',
                 'projects.update',
