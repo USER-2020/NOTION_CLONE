@@ -1,25 +1,172 @@
-# Notion Clone (Prestige Studio)
+# CrewSync
 
-Notion Clone es un espacio de trabajo colaborativo en tiempo real diseñado para organizar tareas, proyectos, documentación y administración de miembros de forma eficiente.
+CrewSync is a Progressive Web Application (PWA) for planning, collaboration, project management, documentation, task organization, and team coordination.
 
-## Características Principales
+The platform enables organizations, teams, agencies, startups, freelancers, and professionals to centralize projects, tasks, workspaces, documentation, members, and workflows in a single digital environment.
 
-- **Espacios de Trabajo**: Creación y administración de múltiples entornos de trabajo personalizados para equipos.
-- **Gestión de Proyectos**: Seguimiento de hitos, estados de tareas (Tableros) y asignación de colaboradores en tiempo real.
-- **Documentación**: Creación y edición de páginas con formato enriquecido (Rich Text Editor).
-- **Gestión de Miembros**: Control granular de roles (Super Admin, Miembro, etc.) y asignación a espacios de trabajo.
+Website: https://your-domain.com
+Product Type: SaaS / PWA
+Category: Project Management Software
+Subcategory: Planning and Collaboration Platform
 
-## Arquitectura Tecnológica
+## Overview
 
-- **Backend**: Laravel (PHP), PHP Artisan
-- **Frontend**: React (Inertia.js), Tailwind CSS
-- **Diseño Visual**: Paleta premium crema y púrpura con glassmorphism y micro-animaciones responsivas.
-- **PWA**: PWA instalado y configurado con Service Workers automáticos para soporte offline de recursos.
+CrewSync provides a centralized workspace where users can:
 
-## Estructura de Rutas Clave
+- Plan projects and activities.
+- Manage tasks and responsibilities.
+- Organize teams and members.
+- Create collaborative workspaces.
+- Store and manage documentation.
+- Monitor project progress.
+- Coordinate workflows across teams.
+- Improve productivity and operational visibility.
 
-- `/dashboard`: Panel de administración principal y resumen de actividad.
-- `/workspaces`: Lista de espacios de trabajo, creación e indexación.
-- `/projects`: Gestión de proyectos y estados de tareas.
-- `/members`: Administración de miembros del equipo, invitaciones y roles del sistema.
-- `/profile`: Ajustes de perfil del usuario, seguridad y sesión activa.
+The platform is designed to be accessible from desktop, tablet, and mobile devices through a Progressive Web App experience.
+
+## Core Features
+
+### Workspaces
+
+CrewSync allows users to create and manage multiple workspaces for departments, clients, teams, organizations, or projects.
+
+### Projects
+
+Projects can be organized with statuses, milestones, objectives, members, priorities, and timelines.
+
+### Tasks
+
+Users can create, assign, track, update, and organize tasks through visual boards and workflow states.
+
+### Team Management
+
+CrewSync supports member management, invitations, permissions, and role-based access control.
+
+### Documentation
+
+Teams can create and maintain internal documentation, operational procedures, notes, guides, and project knowledge.
+
+### Dashboards
+
+The platform includes dashboards for monitoring activity, progress, assigned work, and overall project status.
+
+### Collaboration
+
+Multiple users can work together within shared workspaces while maintaining structured permissions and visibility controls.
+
+### Progressive Web Application
+
+CrewSync is installable as a PWA and provides a native-like experience across devices.
+
+## Target Audience
+
+- Startups
+- Small businesses
+- Medium-sized businesses
+- Enterprise teams
+- Agencies
+- Freelancers
+- Project managers
+- Product teams
+- Development teams
+- Operations teams
+- Marketing teams
+- Remote teams
+
+## Technology Stack
+
+Backend:
+- Laravel
+- PHP
+- Eloquent ORM
+
+Frontend:
+- React
+- Inertia.js
+- Vite
+
+Styling:
+- Tailwind CSS
+
+Authentication:
+- Laravel Breeze
+
+Architecture:
+- Monolithic Laravel Application
+- SPA-like User Experience
+- Progressive Web Application
+
+## Main Modules
+
+### Dashboard
+Path: /dashboard
+
+Centralized overview of projects, tasks, members, and activity.
+
+### Workspaces
+Path: /workspaces
+
+Workspace creation, organization, and management.
+
+### Projects
+Path: /projects
+
+Project planning, monitoring, and execution.
+
+### Tasks
+Path: /tasks
+
+Task management and workflow organization.
+
+### Members
+Path: /members
+
+User administration, invitations, permissions, and access control.
+
+### Profile
+Path: /profile
+
+Personal account configuration and security settings.
+
+## Use Cases
+
+- Team collaboration
+- Project planning
+- Internal documentation
+- Task management
+- Operational coordination
+- Client project management
+- Agency workflows
+- Product development
+- Business process organization
+
+## Keywords
+
+CrewSync
+Project Management
+Task Management
+Workspace Management
+Team Collaboration
+Planning Software
+Productivity Platform
+Workflow Management
+Documentation Platform
+Project Planning
+Team Organization
+Business Productivity
+Kanban Boards
+Work Management
+Collaborative Workspace
+Progressive Web App
+PWA
+Laravel
+React
+Inertia.js
+
+## Company
+
+Organization: Prestige Studio
+
+## AI Summary
+
+CrewSync is a project planning and collaboration platform that combines workspace management, task tracking, documentation, team coordination, and workflow organization within a Progressive Web Application built with Laravel, React, and Inertia.js.

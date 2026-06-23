@@ -72,7 +72,7 @@
 
     {{-- Schema.org JSON-LD: Organization --}}
     <script type="application/ld+json">
-        @json([
+        {!! json_encode([
             '@context' => 'https://schema.org',
             '@type' => 'Organization',
             '@id' => $siteUrl . '#organization',
@@ -88,12 +88,12 @@
                 '@type' => 'Brand',
                 'name' => $appName,
             ],
-        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) !!}
     </script>
 
     {{-- Schema.org JSON-LD: WebSite --}}
     <script type="application/ld+json">
-        @json([
+        {!! json_encode([
             '@context' => 'https://schema.org',
             '@type' => 'WebSite',
             '@id' => $siteUrl . '#website',
@@ -105,12 +105,12 @@
             'publisher' => [
                 '@id' => $siteUrl . '#organization',
             ],
-        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) !!}
     </script>
 
     {{-- Schema.org JSON-LD: SoftwareApplication --}}
     <script type="application/ld+json">
-        @json([
+        {!! json_encode([
             '@context' => 'https://schema.org',
             '@type' => 'SoftwareApplication',
             '@id' => $siteUrl . '#software-application',
@@ -188,7 +188,7 @@
                     ],
                 ],
             ],
-        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) !!}
     </script>
 
     {{-- Service Worker --}}
