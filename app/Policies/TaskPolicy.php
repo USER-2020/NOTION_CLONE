@@ -37,6 +37,11 @@ class TaskPolicy
         return $this->view($user, $task) && ($user->can('tasks.manage') || $user->hasRole('member'));
     }
 
+    public function schedule(User $user, Task $task): bool
+    {
+        return $this->view($user, $task) && ($user->can('tasks.manage') || $user->hasRole('member'));
+    }
+
     public function comment(User $user, Task $task): bool
     {
         return $this->view($user, $task) && $user->can('comments.create');

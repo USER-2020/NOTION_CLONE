@@ -10,6 +10,7 @@ use App\Models\Workspace;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -41,6 +42,7 @@ class ProjectController extends Controller
                     'id' => $project->id,
                     'name' => $project->name,
                     'description' => $project->description,
+                    'logo_url' => $project->logo_path ? Storage::disk('public')->url($project->logo_path) : null,
                     'color' => $project->color,
                     'status' => $project->status,
                     'workspace' => $project->workspace,
@@ -72,7 +74,7 @@ class ProjectController extends Controller
         $this->authorize('create', Project::class);
 
         $project = Project::create([
-            ...collect($request->validated())->except(['manager_ids', 'member_ids'])->all(),
+            ...collect($request->validated())->except(['manager_ids', 'member_ids', 'logo', 'remove_logo'])->all(),
             'workspace_id' => $workspace->id,
             'slug' => $this->uniqueSlug($workspace->id, $request->string('name')->toString()),
             'owner_id' => $request->user()->id,
@@ -81,6 +83,12 @@ class ProjectController extends Controller
             'icon' => $request->input('icon', 'folder'),
             'color' => $request->input('color', '#1f7a8c'),
         ]);
+
+        if ($request->hasFile('logo')) {
+            $project->update([
+                'logo_path' => $request->file('logo')->store("projects/{$project->id}/logo", 'public'),
+            ]);
+        }
 
         return to_route('projects.show', $project)->with('success', 'Proyecto creado correctamente.');
     }
@@ -111,6 +119,7 @@ class ProjectController extends Controller
                 'name' => $project->name,
                 'slug' => $project->slug,
                 'description' => $project->description,
+                'logo_url' => $project->logo_path ? Storage::disk('public')->url($project->logo_path) : null,
                 'status' => $project->status,
                 'priority' => $project->priority,
                 'start_date' => $project->start_date?->toDateString(),
@@ -144,10 +153,25 @@ class ProjectController extends Controller
         $workspace = Workspace::query()->visibleForUser($request->user())->findOrFail($request->integer('workspace_id'));
 
         $project->update([
-            ...collect($request->validated())->except(['manager_ids', 'member_ids'])->all(),
+            ...collect($request->validated())->except(['manager_ids', 'member_ids', 'logo', 'remove_logo'])->all(),
             'workspace_id' => $workspace->id,
             'slug' => $this->uniqueSlug($workspace->id, $request->string('name')->toString(), $project->id),
         ]);
+
+        if ($request->boolean('remove_logo') && $project->logo_path) {
+            Storage::disk('public')->delete($project->logo_path);
+            $project->update(['logo_path' => null]);
+        }
+
+        if ($request->hasFile('logo')) {
+            if ($project->logo_path) {
+                Storage::disk('public')->delete($project->logo_path);
+            }
+
+            $project->update([
+                'logo_path' => $request->file('logo')->store("projects/{$project->id}/logo", 'public'),
+            ]);
+        }
 
         $this->syncProjectParticipants(
             $project,

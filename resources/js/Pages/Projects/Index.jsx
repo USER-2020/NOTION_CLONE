@@ -1,4 +1,5 @@
 import AppSelect from '@/Components/AppSelect';
+import LogoUploadField from '@/Components/LogoUploadField';
 import Modal from '@/Components/Modal';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
@@ -70,6 +71,8 @@ export default function ProjectsIndex({ projects, workspaces }) {
         workspace_id: workspaces[0]?.id ?? '',
         name: '',
         description: '',
+        logo: null,
+        remove_logo: false,
     });
 
     const closeModal = () => {
@@ -81,6 +84,7 @@ export default function ProjectsIndex({ projects, workspaces }) {
     const submit = (event) => {
         event.preventDefault();
         form.post(route('projects.store'), {
+            forceFormData: true,
             onSuccess: () => closeModal(),
         });
     };
@@ -212,7 +216,17 @@ export default function ProjectsIndex({ projects, workspaces }) {
                             <div className="flex min-w-0 items-start justify-between gap-3">
                                 <div className="min-w-0">
                                     <div className="flex items-center gap-3">
-                                        <FiFolder className="theme-text-muted h-4 w-4" />
+                                        {project.logo_url ? (
+                                            <img
+                                                src={project.logo_url}
+                                                alt={`Logo de ${project.name}`}
+                                                className="h-10 w-10 rounded-2xl object-cover"
+                                            />
+                                        ) : (
+                                            <div className="theme-muted flex h-10 w-10 items-center justify-center rounded-2xl">
+                                                <FiFolder className="theme-text-muted h-4 w-4" />
+                                            </div>
+                                        )}
                                         <span
                                             className="h-3 w-3 rounded-full shadow-sm ring-2 ring-white/40"
                                             style={{ backgroundColor: projectStatusIndicator[project.status] ?? project.color ?? '#7f23ce' }}
@@ -335,6 +349,17 @@ export default function ProjectsIndex({ projects, workspaces }) {
                             placeholder="Descripción"
                             value={form.data.description}
                             onChange={(event) => form.setData('description', event.target.value)}
+                        />
+
+                        <LogoUploadField
+                            label="Logo del proyecto"
+                            hint="Opcional. Puedes asociar un logo visual para diferenciar este proyecto."
+                            file={form.data.logo}
+                            currentUrl={null}
+                            removeRequested={form.data.remove_logo}
+                            onFileChange={(file) => form.setData('logo', file)}
+                            onRemoveChange={(value) => form.setData('remove_logo', value)}
+                            error={form.errors.logo}
                         />
 
                         <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">

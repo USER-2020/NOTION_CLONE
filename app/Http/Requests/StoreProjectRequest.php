@@ -18,6 +18,8 @@ class StoreProjectRequest extends FormRequest
             'workspace_id' => ['required', 'integer', 'exists:workspaces,id'],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
+            'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:4096'],
+            'remove_logo' => ['nullable', 'boolean'],
             'status' => ['nullable', Rule::in(['active', 'planning', 'paused', 'completed'])],
             'priority' => ['nullable', Rule::in(['low', 'medium', 'high', 'urgent'])],
             'start_date' => ['nullable', 'date'],

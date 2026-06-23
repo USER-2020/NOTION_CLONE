@@ -40,9 +40,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/tasks', [TaskController::class, 'index'])->name('tasks.index');
     Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store');
     Route::patch('/tasks/{task}/move', [TaskController::class, 'move'])->name('tasks.move');
+    Route::patch('/tasks/{task}/schedule', [TaskController::class, 'updateSchedule'])->name('tasks.schedule');
     Route::post('/tasks/{task}/comments', [TaskController::class, 'storeComment'])->name('tasks.comments.store');
     Route::post('/tasks/{task}/subtasks', [TaskController::class, 'storeSubtask'])->name('tasks.subtasks.store');
     Route::patch('/tasks/{task}/subtasks/{subtask}', [TaskController::class, 'updateSubtask'])->name('tasks.subtasks.update');
+    Route::patch('/tasks/{task}/subtasks/{subtask}/schedule', [TaskController::class, 'updateSubtaskSchedule'])->name('tasks.subtasks.schedule');
     Route::delete('/tasks/{task}/subtasks/{subtask}', [TaskController::class, 'destroySubtask'])->name('tasks.subtasks.destroy');
     Route::patch('/tasks/{task}', [TaskController::class, 'update'])->name('tasks.update');
     Route::delete('/tasks/{task}', [TaskController::class, 'destroy'])->name('tasks.destroy');

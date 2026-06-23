@@ -171,9 +171,18 @@ function SidebarContent({
                     <Link href="/" className="mt-3 inline-flex max-w-full">
                         <BrandLogo compact imageClassName="max-h-10 max-w-[180px]" />
                     </Link>
-                    <h1 className="theme-text-primary mt-3 truncate text-xl font-semibold">
-                        {currentWorkspace?.name ?? 'SmartSend Workspace'}
-                    </h1>
+                    <div className="mt-3 flex items-center gap-3">
+                        {currentWorkspace?.logo_url ? (
+                            <img
+                                src={currentWorkspace.logo_url}
+                                alt={`Logo de ${currentWorkspace.name}`}
+                                className="h-10 w-10 rounded-2xl object-cover"
+                            />
+                        ) : null}
+                        <h1 className="theme-text-primary min-w-0 truncate text-xl font-semibold">
+                            {currentWorkspace?.name ?? 'SmartSend Workspace'}
+                        </h1>
+                    </div>
                 </div>
 
                 {closeMobileMenu && (

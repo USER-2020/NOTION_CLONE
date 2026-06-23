@@ -1,4 +1,5 @@
 import AppDatePicker from '@/Components/AppDatePicker';
+import LogoUploadField from '@/Components/LogoUploadField';
 import AppSelect from '@/Components/AppSelect';
 import MemberMultiSelect from '@/Components/MemberMultiSelect';
 import Modal from '@/Components/Modal';
@@ -120,6 +121,8 @@ export default function ProjectShow({ project, workspaces, managerOptions, membe
         due_date: project.due_date ?? '',
         icon: project.icon ?? 'folder',
         color: project.color ?? '#1f7a8c',
+        logo: null,
+        remove_logo: false,
         manager_ids: project.manager_ids ?? [],
         member_ids: project.member_ids ?? [],
     });
@@ -136,6 +139,21 @@ export default function ProjectShow({ project, workspaces, managerOptions, membe
 
     function closeEditProjectModal() {
         setShowEditProjectModal(false);
+        form.setData({
+            workspace_id: project.workspace_id,
+            name: project.name,
+            description: project.description ?? '',
+            status: project.status,
+            priority: project.priority,
+            start_date: project.start_date ?? '',
+            due_date: project.due_date ?? '',
+            icon: project.icon ?? 'folder',
+            color: project.color ?? '#1f7a8c',
+            logo: null,
+            remove_logo: false,
+            manager_ids: project.manager_ids ?? [],
+            member_ids: project.member_ids ?? [],
+        });
         form.clearErrors();
     }
 
@@ -148,6 +166,7 @@ export default function ProjectShow({ project, workspaces, managerOptions, membe
     function submit(event) {
         event.preventDefault();
         form.patch(route('projects.update', project.id), {
+            forceFormData: true,
             onSuccess: () => closeEditProjectModal(),
         });
     }
@@ -169,9 +188,17 @@ export default function ProjectShow({ project, workspaces, managerOptions, membe
                         <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-start gap-4">
-                                    <span className="theme-accent-soft rounded-2xl p-3">
-                                        <FiFolder className="h-5 w-5" />
-                                    </span>
+                                    {project.logo_url ? (
+                                        <img
+                                            src={project.logo_url}
+                                            alt={`Logo de ${project.name}`}
+                                            className="h-14 w-14 rounded-[1.35rem] object-cover"
+                                        />
+                                    ) : (
+                                        <span className="theme-accent-soft rounded-2xl p-3">
+                                            <FiFolder className="h-5 w-5" />
+                                        </span>
+                                    )}
 
                                     <div className="min-w-0 flex-1">
                                         <p className="theme-text-muted text-xs uppercase tracking-[0.28em]">Proyecto</p>
@@ -410,6 +437,17 @@ export default function ProjectShow({ project, workspaces, managerOptions, membe
                         </div>
 
                         <textarea className="theme-input h-32 w-full rounded-2xl border px-4 py-3" value={form.data.description} onChange={(event) => form.setData('description', event.target.value)} placeholder="Descripción" />
+
+                        <LogoUploadField
+                            label="Logo del proyecto"
+                            hint="Puedes asociar un logo opcional y reemplazarlo o quitarlo cuando quieras."
+                            file={form.data.logo}
+                            currentUrl={project.logo_url}
+                            removeRequested={form.data.remove_logo}
+                            onFileChange={(file) => form.setData('logo', file)}
+                            onRemoveChange={(value) => form.setData('remove_logo', value)}
+                            error={form.errors.logo}
+                        />
 
                         <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
                             <AppSelect value={form.data.priority} onChange={(event) => form.setData('priority', event.target.value)}>

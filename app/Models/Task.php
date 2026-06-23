@@ -21,6 +21,7 @@ class Task extends Model
         'description',
         'status',
         'priority',
+        'start_date',
         'reporter_id',
         'due_date',
         'completed_at',
@@ -28,6 +29,7 @@ class Task extends Model
     ];
 
     protected $casts = [
+        'start_date' => 'date',
         'due_date' => 'date',
         'completed_at' => 'datetime',
     ];

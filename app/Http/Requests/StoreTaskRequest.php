@@ -26,7 +26,8 @@ class StoreTaskRequest extends FormRequest
             'priority' => ['required', Rule::in(['low', 'medium', 'high', 'urgent'])],
             'assignee_ids' => ['nullable', 'array'],
             'assignee_ids.*' => ['integer', 'exists:users,id'],
-            'due_date' => ['nullable', 'date'],
+            'start_date' => ['nullable', 'date'],
+            'due_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'position' => ['nullable', 'integer', 'min:0'],
         ];
     }

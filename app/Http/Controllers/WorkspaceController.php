@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -28,6 +29,7 @@ class WorkspaceController extends Controller
                     'name' => $workspace->name,
                     'slug' => $workspace->slug,
                     'description' => $workspace->description,
+                    'logo_url' => $workspace->logo_path ? Storage::disk('public')->url($workspace->logo_path) : null,
                     'owner_id' => $workspace->owner_id,
                     'owner' => $workspace->owner ? [
                         'id' => $workspace->owner->id,
@@ -60,6 +62,8 @@ class WorkspaceController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
             'owner_id' => ['nullable', 'integer', 'exists:users,id'],
+            'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:4096'],
+            'remove_logo' => ['nullable', 'boolean'],
         ]);
 
         $ownerId = $validated['owner_id'] ?? $request->user()->id;
@@ -72,6 +76,12 @@ class WorkspaceController extends Controller
             'owner_id' => $ownerId,
             'settings' => ['theme' => 'obsidian-sand'],
         ]);
+
+        if ($request->hasFile('logo')) {
+            $workspace->update([
+                'logo_path' => $request->file('logo')->store("workspaces/{$workspace->id}/logo", 'public'),
+            ]);
+        }
 
         $members = [
             $ownerId => ['role' => 'owner', 'joined_at' => now()],
@@ -95,6 +105,8 @@ class WorkspaceController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
             'owner_id' => ['required', 'integer', 'exists:users,id'],
+            'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:4096'],
+            'remove_logo' => ['nullable', 'boolean'],
         ]);
 
         User::query()->selectableBy($request->user())->findOrFail($validated['owner_id']);
@@ -107,6 +119,21 @@ class WorkspaceController extends Controller
             'description' => $validated['description'] ?? null,
             'owner_id' => $validated['owner_id'],
         ]);
+
+        if ($request->boolean('remove_logo') && $workspace->logo_path) {
+            Storage::disk('public')->delete($workspace->logo_path);
+            $workspace->update(['logo_path' => null]);
+        }
+
+        if ($request->hasFile('logo')) {
+            if ($workspace->logo_path) {
+                Storage::disk('public')->delete($workspace->logo_path);
+            }
+
+            $workspace->update([
+                'logo_path' => $request->file('logo')->store("workspaces/{$workspace->id}/logo", 'public'),
+            ]);
+        }
 
         $workspace->users()->syncWithoutDetaching([
             $validated['owner_id'] => ['role' => 'owner', 'joined_at' => now()],

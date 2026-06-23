@@ -18,6 +18,7 @@ class Workspace extends Model
         'name',
         'slug',
         'description',
+        'logo_path',
         'owner_id',
         'settings',
     ];
@@ -86,6 +87,6 @@ class Workspace extends Model
         return static::query()
             ->visibleForUser($user)
             ->orderBy('name')
-            ->get(['id', 'name', 'slug']);
+            ->get(['id', 'name', 'slug', 'logo_path']);
     }
 }

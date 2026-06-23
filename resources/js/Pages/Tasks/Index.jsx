@@ -275,6 +275,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
     const isMember = auth.roles?.includes('member');
     const canCreateTasks = !isMember && auth.permissions?.includes('tasks.manage');
     const canFullyManageTasks = !isMember && auth.permissions?.includes('tasks.manage');
+    const canScheduleTasks = canFullyManageTasks || isMember;
     const canCommentOnTasks = auth.permissions?.includes('comments.create');
     const filteredProjectId = filters.project_id ? Number(filters.project_id) : null;
     const requestedTaskId = filters.task_id ? Number(filters.task_id) : null;
@@ -289,6 +290,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
     const commentForm = useForm({
         body: '',
         parent_id: null,
+        files: [],
     });
     const [priorityFilter, setPriorityFilter] = useState('all');
 
@@ -299,6 +301,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
         status: 'todo',
         priority: 'medium',
         assignee_ids: [],
+        start_date: '',
         due_date: '',
         position: 0,
     });
@@ -306,6 +309,8 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
     const subtaskForm = useForm({
         title: '',
         assignee_ids: [],
+        start_date: '',
+        due_date: '',
     });
 
     const taskForm = useForm({
@@ -315,9 +320,11 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
         status: 'todo',
         priority: 'medium',
         assignee_ids: [],
+        start_date: '',
         due_date: '',
         position: 0,
     });
+    const [subtaskScheduleDrafts, setSubtaskScheduleDrafts] = useState({});
 
     useEffect(() => {
         setBoardTasks(tasks);
@@ -358,9 +365,21 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
             status: selectedTask.status ?? 'todo',
             priority: selectedTask.priority ?? 'medium',
             assignee_ids: selectedTask.assignee_ids ?? [],
+            start_date: selectedTask.start_date ?? '',
             due_date: selectedTask.due_date ?? '',
             position: selectedTask.position ?? 0,
         });
+        setSubtaskScheduleDrafts(
+            Object.fromEntries(
+                (selectedTask.children ?? []).map((child) => [
+                    child.id,
+                    {
+                        start_date: child.start_date ?? '',
+                        due_date: child.due_date ?? '',
+                    },
+                ])
+            )
+        );
     }, [selectedTask]);
 
     function membersForProject(projectId) {
@@ -373,7 +392,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
         createForm.post(route('tasks.store'), {
             preserveScroll: true,
             onSuccess: () => {
-                createForm.reset('title', 'description', 'assignee_ids', 'due_date');
+                createForm.reset('title', 'description', 'assignee_ids', 'start_date', 'due_date');
                 createForm.setData('status', 'todo');
                 createForm.setData('priority', 'medium');
                 setShowCreateTaskModal(false);
@@ -470,8 +489,18 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
 
     function resetCommentForm() {
         setReplyingToCommentId(null);
-        commentForm.reset();
+        commentForm.reset('body', 'parent_id', 'files');
         commentForm.setData('parent_id', null);
+    }
+
+    function updateSubtaskScheduleDraft(subtaskId, field, value) {
+        setSubtaskScheduleDrafts((current) => ({
+            ...current,
+            [subtaskId]: {
+                ...(current[subtaskId] ?? {}),
+                [field]: value,
+            },
+        }));
     }
 
     const taskProgress = selectedTask ? subtaskProgress(selectedTask) : { total: 0, completed: 0, percent: 0 };
@@ -704,7 +733,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                 </div>
                             </div>
 
-                            {canFullyManageTasks && <section className="rounded-[2rem] border border-stone-800 bg-stone-900/70 p-6">
+                            {(canFullyManageTasks || canScheduleTasks) && <section className="rounded-[2rem] border border-stone-800 bg-stone-900/70 p-6">
                                 <div className="flex items-center justify-between gap-4">
                                     <div>
                                         <p className="text-xs uppercase tracking-[0.2em] text-stone-500">Subtareas</p>
@@ -721,7 +750,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                     <div className="h-full rounded-full bg-amber-300 transition-all" style={{ width: `${taskProgress.percent}%` }} />
                                 </div>
 
-                                <form
+                                {canFullyManageTasks && <form
                                     onSubmit={(event) => {
                                         event.preventDefault();
 
@@ -745,6 +774,20 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                         selectedIds={subtaskForm.data.assignee_ids}
                                         onChange={(ids) => subtaskForm.setData('assignee_ids', ids)}
                                     />
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        <AppDatePicker
+                                            className="border-stone-700 bg-stone-950 text-stone-100"
+                                            value={subtaskForm.data.start_date}
+                                            onChange={(event) => subtaskForm.setData('start_date', event.target.value)}
+                                            placeholder="Fecha de inicio"
+                                        />
+                                        <AppDatePicker
+                                            className="border-stone-700 bg-stone-950 text-stone-100"
+                                            value={subtaskForm.data.due_date}
+                                            onChange={(event) => subtaskForm.setData('due_date', event.target.value)}
+                                            placeholder="Fecha limite"
+                                        />
+                                    </div>
                                     <button
                                         type="submit"
                                         disabled={subtaskForm.processing}
@@ -753,9 +796,9 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                         <FiPlus className="h-4 w-4" />
                                         Crear subtarea
                                     </button>
-                                </form>
+                                </form>}
 
-                                {(subtaskForm.errors.title || subtaskForm.errors.assignee_ids) && (
+                                {canFullyManageTasks && (subtaskForm.errors.title || subtaskForm.errors.assignee_ids) && (
                                     <div className="mt-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
                                         {subtaskForm.errors.title || subtaskForm.errors.assignee_ids}
                                     </div>
@@ -796,9 +839,48 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                                             <span>{formatAssigneeNames(child.assignees)}</span>
                                                             <span>{statusLabels[child.status] ?? child.status.replace('_', ' ')}</span>
                                                         </div>
+                                                        {canScheduleTasks && (
+                                                            <form
+                                                                onSubmit={(event) => {
+                                                                    event.preventDefault();
+
+                                                                    router.patch(
+                                                                        route('tasks.subtasks.schedule', [selectedTask.id, child.id]),
+                                                                        subtaskScheduleDrafts[child.id] ?? {
+                                                                            start_date: child.start_date ?? '',
+                                                                            due_date: child.due_date ?? '',
+                                                                        },
+                                                                        { preserveScroll: true }
+                                                                    );
+                                                                }}
+                                                                className="mt-4 grid gap-3 md:grid-cols-2"
+                                                            >
+                                                                <AppDatePicker
+                                                                    className="border-stone-700 bg-stone-950 text-stone-100"
+                                                                    value={subtaskScheduleDrafts[child.id]?.start_date ?? ''}
+                                                                    onChange={(event) => updateSubtaskScheduleDraft(child.id, 'start_date', event.target.value)}
+                                                                    placeholder="Fecha de inicio"
+                                                                />
+                                                                <AppDatePicker
+                                                                    className="border-stone-700 bg-stone-950 text-stone-100"
+                                                                    value={subtaskScheduleDrafts[child.id]?.due_date ?? ''}
+                                                                    onChange={(event) => updateSubtaskScheduleDraft(child.id, 'due_date', event.target.value)}
+                                                                    placeholder="Fecha limite"
+                                                                />
+                                                                <div className="md:col-span-2 flex justify-end">
+                                                                    <button
+                                                                        type="submit"
+                                                                        className="inline-flex items-center gap-2 rounded-2xl border border-stone-700 px-3 py-2 text-xs text-stone-200 transition hover:border-amber-300 hover:text-amber-200"
+                                                                    >
+                                                                        <FiSave className="h-3.5 w-3.5" />
+                                                                        Guardar fechas
+                                                                    </button>
+                                                                </div>
+                                                            </form>
+                                                        )}
                                                     </div>
 
-                                                    <button
+                                                    {canFullyManageTasks && <button
                                                         type="button"
                                                         onClick={() => {
                                                             router.delete(route('tasks.subtasks.destroy', [selectedTask.id, child.id]), {
@@ -809,7 +891,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                                     >
                                                         <FiTrash2 className="h-3.5 w-3.5" />
                                                         Eliminar
-                                                    </button>
+                                                    </button>}
                                                 </div>
                                             </div>
                                         ))
@@ -895,6 +977,16 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                     </div>
 
                                     <div>
+                                        <label className="text-xs uppercase tracking-[0.2em] text-stone-500">Fecha de inicio</label>
+                                        <AppDatePicker
+                                            className="mt-2 border-stone-700 bg-stone-950 text-stone-100"
+                                            value={taskForm.data.start_date}
+                                            onChange={(event) => taskForm.setData('start_date', event.target.value)}
+                                            placeholder="Selecciona fecha de inicio"
+                                        />
+                                    </div>
+
+                                    <div>
                                         <label className="text-xs uppercase tracking-[0.2em] text-stone-500">Fecha límite</label>
                                         <AppDatePicker
                                             className="mt-2 border-stone-700 bg-stone-950 text-stone-100"
@@ -939,8 +1031,52 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                         </div>
                                     </div>
                                     <div className="rounded-3xl border border-amber-300/25 bg-amber-300/10 p-4 text-sm text-stone-300">
-                                        Como miembro solo puedes cambiar el estado de la tarea y participar en los comentarios.
+                                        Como miembro puedes cambiar el estado, actualizar las fechas y participar en los comentarios con archivos adjuntos.
                                     </div>
+
+                                    {canScheduleTasks && (
+                                        <form
+                                            onSubmit={(event) => {
+                                                event.preventDefault();
+
+                                                taskForm.patch(route('tasks.schedule', selectedTask.id), {
+                                                    preserveScroll: true,
+                                                });
+                                            }}
+                                            className="grid gap-4 rounded-3xl border border-stone-800 bg-stone-950/70 p-4 md:grid-cols-2"
+                                        >
+                                            <div>
+                                                <label className="text-xs uppercase tracking-[0.2em] text-stone-500">Fecha de inicio</label>
+                                                <AppDatePicker
+                                                    className="mt-2 border-stone-700 bg-stone-950 text-stone-100"
+                                                    value={taskForm.data.start_date}
+                                                    onChange={(event) => taskForm.setData('start_date', event.target.value)}
+                                                    placeholder="Selecciona fecha de inicio"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="text-xs uppercase tracking-[0.2em] text-stone-500">Fecha limite</label>
+                                                <AppDatePicker
+                                                    className="mt-2 border-stone-700 bg-stone-950 text-stone-100"
+                                                    value={taskForm.data.due_date}
+                                                    onChange={(event) => taskForm.setData('due_date', event.target.value)}
+                                                    placeholder="Selecciona fecha limite"
+                                                />
+                                            </div>
+
+                                            <div className="md:col-span-2 flex justify-end">
+                                                <button
+                                                    type="submit"
+                                                    disabled={taskForm.processing}
+                                                    className="inline-flex items-center gap-2 rounded-2xl bg-amber-300 px-5 py-3 text-sm font-medium text-stone-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
+                                                >
+                                                    <FiSave className="h-4 w-4" />
+                                                    Guardar fechas
+                                                </button>
+                                            </div>
+                                        </form>
+                                    )}
                                 </section>
                             )}
 
@@ -955,6 +1091,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                         event.preventDefault();
 
                                         commentForm.post(route('tasks.comments.store', selectedTask.id), {
+                                            forceFormData: true,
                                             preserveScroll: true,
                                             onSuccess: () => resetCommentForm(),
                                         });
@@ -989,6 +1126,24 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                         </div>
                                     )}
 
+                                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-stone-700 px-4 py-3 text-sm text-stone-300 transition hover:border-amber-300 hover:text-amber-200">
+                                        <FiPaperclip className="h-4 w-4" />
+                                        Adjuntar archivos
+                                        <input
+                                            type="file"
+                                            multiple
+                                            accept="image/*,.pdf,.txt,.doc,.docx"
+                                            className="hidden"
+                                            onChange={(event) => commentForm.setData('files', Array.from(event.target.files ?? []))}
+                                        />
+                                    </label>
+
+                                    {commentForm.data.files?.length ? (
+                                        <div className="rounded-2xl border border-stone-800 bg-stone-950/70 px-4 py-3 text-sm text-stone-300">
+                                            {commentForm.data.files.map((file) => file.name).join(', ')}
+                                        </div>
+                                    ) : null}
+
                                     <button
                                         type="submit"
                                         disabled={commentForm.processing}
@@ -1008,6 +1163,22 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                                     <p className="text-xs text-stone-500">{formatFriendlyDateTime(comment.created_at)}</p>
                                                 </div>
                                                 <p className="mt-3 text-sm leading-6 text-stone-300">{comment.body}</p>
+                                                {comment.attachments?.length ? (
+                                                    <div className="mt-4 flex flex-wrap gap-2">
+                                                        {comment.attachments.map((attachment) => (
+                                                            <a
+                                                                key={attachment.id}
+                                                                href={attachment.url}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="inline-flex items-center gap-2 rounded-full border border-stone-700 px-3 py-2 text-xs text-stone-300 transition hover:border-amber-300 hover:text-amber-200"
+                                                            >
+                                                                <FiPaperclip className="h-3.5 w-3.5" />
+                                                                {attachment.name}
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                ) : null}
                                                 <div className="mt-4 flex items-center gap-3">
                                                     <button
                                                         type="button"
@@ -1032,6 +1203,22 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                                                     <p className="text-xs text-stone-500">{formatFriendlyDateTime(reply.created_at)}</p>
                                                                 </div>
                                                                 <p className="mt-3 text-sm leading-6 text-stone-300">{reply.body}</p>
+                                                                {reply.attachments?.length ? (
+                                                                    <div className="mt-4 flex flex-wrap gap-2">
+                                                                        {reply.attachments.map((attachment) => (
+                                                                            <a
+                                                                                key={attachment.id}
+                                                                                href={attachment.url}
+                                                                                target="_blank"
+                                                                                rel="noreferrer"
+                                                                                className="inline-flex items-center gap-2 rounded-full border border-stone-700 px-3 py-2 text-xs text-stone-300 transition hover:border-amber-300 hover:text-amber-200"
+                                                                            >
+                                                                                <FiPaperclip className="h-3.5 w-3.5" />
+                                                                                {attachment.name}
+                                                                            </a>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : null}
                                                             </div>
                                                         ))}
                                                     </div>
@@ -1229,7 +1416,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                         </div>
 
                         <div className="rounded-[1.75rem] border border-[color:var(--border)] bg-[color:var(--bg-surface)]/80 p-4 sm:p-5">
-                            <div className="grid gap-4 lg:grid-cols-3">
+                            <div className="grid gap-4 lg:grid-cols-4">
                             <AppSelect value={createForm.data.status} onChange={(event) => createForm.setData('status', event.target.value)}>
                                 {columns.map((column) => (
                                     <option key={column.key} value={column.key}>
@@ -1245,6 +1432,13 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                     </option>
                                 ))}
                             </AppSelect>
+
+                            <AppDatePicker
+                                className="text-stone-100"
+                                value={createForm.data.start_date}
+                                onChange={(event) => createForm.setData('start_date', event.target.value)}
+                                placeholder="Fecha de inicio"
+                            />
 
                             <AppDatePicker
                                 className="text-stone-100"

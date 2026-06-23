@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\Workspace;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -57,11 +58,13 @@ class HandleInertiaRequests extends Middleware
                     'id' => $currentWorkspace->id,
                     'name' => $currentWorkspace->name,
                     'slug' => $currentWorkspace->slug,
+                    'logo_url' => $currentWorkspace->logo_path ? Storage::disk('public')->url($currentWorkspace->logo_path) : null,
                 ] : null,
                 'available' => $availableWorkspaces->map(fn (Workspace $workspace) => [
                     'id' => $workspace->id,
                     'name' => $workspace->name,
                     'slug' => $workspace->slug,
+                    'logo_url' => $workspace->logo_path ? Storage::disk('public')->url($workspace->logo_path) : null,
                 ])->values(),
             ],
             'flash' => [

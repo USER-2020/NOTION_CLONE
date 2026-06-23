@@ -18,6 +18,7 @@ class Project extends Model
         'name',
         'slug',
         'description',
+        'logo_path',
         'status',
         'priority',
         'start_date',

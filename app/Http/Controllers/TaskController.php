@@ -51,10 +51,14 @@ class TaskController extends Controller
                     'assignees:id,name',
                     'reporter:id,name',
                     'comments.user:id,name',
+                    'comments.attachments.uploader:id,name',
                     'comments.replies.user:id,name',
+                    'comments.replies.attachments.uploader:id,name',
                     'attachments:id,attachable_id,attachable_type,uploaded_by,disk,path,name,mime_type,size,created_at',
                     'attachments.uploader:id,name',
                     'children.assignees:id,name',
+                    'children.attachments:id,attachable_id,attachable_type,uploaded_by,disk,path,name,mime_type,size,created_at',
+                    'children.attachments.uploader:id,name',
                 ])
                 ->orderBy('position')
                 ->get()
@@ -134,6 +138,8 @@ class TaskController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'assignee_ids' => ['nullable', 'array'],
             'assignee_ids.*' => ['integer', 'exists:users,id'],
+            'start_date' => ['nullable', 'date'],
+            'due_date' => ['nullable', 'date', 'after_or_equal:start_date'],
         ]);
 
         $memberIds = $task->project->members()->pluck('users.id')->push($task->project->owner_id);
@@ -150,6 +156,8 @@ class TaskController extends Controller
             'description' => null,
             'status' => 'todo',
             'priority' => 'medium',
+            'start_date' => $validated['start_date'] ?? null,
+            'due_date' => $validated['due_date'] ?? null,
             'assignee_id' => collect($validated['assignee_ids'] ?? [])->filter()->map(fn ($id) => (int) $id)->first(),
             'reporter_id' => $request->user()->id,
             'position' => $this->nextChildPosition($task),
@@ -174,6 +182,8 @@ class TaskController extends Controller
             'status' => ['sometimes', Rule::in(['todo', 'in_progress', 'done', 'blocked'])],
             'assignee_ids' => ['nullable', 'array'],
             'assignee_ids.*' => ['integer', 'exists:users,id'],
+            'start_date' => ['nullable', 'date'],
+            'due_date' => ['nullable', 'date', 'after_or_equal:start_date'],
         ]);
 
         $memberIds = $task->project->members()->pluck('users.id')->push($task->project->owner_id);
@@ -199,6 +209,43 @@ class TaskController extends Controller
         $this->notifyStatusChange($subtask, $originalStatus, $validated['status'] ?? $originalStatus, $request->user());
 
         return back()->with('success', 'Subtarea actualizada correctamente.');
+    }
+
+    public function updateSchedule(Request $request, Task $task): RedirectResponse
+    {
+        $this->authorize('schedule', $task);
+
+        $validated = $request->validate([
+            'start_date' => ['nullable', 'date'],
+            'due_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+        ]);
+
+        $task->update([
+            'start_date' => $validated['start_date'] ?? null,
+            'due_date' => $validated['due_date'] ?? null,
+        ]);
+
+        return back()->with('success', 'Fechas de la tarea actualizadas correctamente.');
+    }
+
+    public function updateSubtaskSchedule(Request $request, Task $task, Task $subtask): RedirectResponse
+    {
+        $this->authorize('schedule', $task);
+        $this->authorize('schedule', $subtask);
+
+        abort_unless($subtask->parent_id === $task->id, 404);
+
+        $validated = $request->validate([
+            'start_date' => ['nullable', 'date'],
+            'due_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+        ]);
+
+        $subtask->update([
+            'start_date' => $validated['start_date'] ?? null,
+            'due_date' => $validated['due_date'] ?? null,
+        ]);
+
+        return back()->with('success', 'Fechas de la subtarea actualizadas correctamente.');
     }
 
     public function destroySubtask(Task $task, Task $subtask): RedirectResponse
@@ -263,6 +310,8 @@ class TaskController extends Controller
         $validated = $request->validate([
             'body' => ['required', 'string', 'max:3000'],
             'parent_id' => ['nullable', 'integer', 'exists:comments,id'],
+            'files' => ['nullable', 'array'],
+            'files.*' => ['file', 'mimes:jpg,jpeg,png,gif,webp,bmp,svg,pdf,txt,doc,docx', 'max:10240'],
         ]);
 
         if (! empty($validated['parent_id'])) {
@@ -278,6 +327,19 @@ class TaskController extends Controller
             'parent_id' => $validated['parent_id'] ?? null,
             'body' => $validated['body'],
         ]);
+
+        foreach ($validated['files'] ?? [] as $file) {
+            $path = $file->store("comments/{$comment->id}", 'public');
+
+            $comment->attachments()->create([
+                'uploaded_by' => $request->user()->id,
+                'disk' => 'public',
+                'path' => $path,
+                'name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getClientMimeType(),
+                'size' => $file->getSize(),
+            ]);
+        }
 
         $this->notifyCommentParticipants($task, $comment, $request->user());
 
@@ -363,6 +425,7 @@ class TaskController extends Controller
             'status' => $task->status,
             'priority' => $task->priority,
             'reporter_id' => $task->reporter_id,
+            'start_date' => $task->start_date?->toDateString(),
             'due_date' => $task->due_date?->toDateString(),
             'completed_at' => $task->completed_at?->toISOString(),
             'position' => $task->position,
@@ -398,6 +461,8 @@ class TaskController extends Controller
                 'id' => $child->id,
                 'title' => $child->title,
                 'status' => $child->status,
+                'start_date' => $child->start_date?->toDateString(),
+                'due_date' => $child->due_date?->toDateString(),
                 'assignee_ids' => $child->assignees->pluck('id')->values(),
                 'assignees' => $child->assignees->map(fn (User $assignee) => [
                     'id' => $assignee->id,
@@ -405,6 +470,7 @@ class TaskController extends Controller
                 ])->values(),
                 'completed_at' => $child->completed_at?->toISOString(),
                 'position' => $child->position,
+                'attachments' => $child->attachments->map(fn (Attachment $attachment) => $this->serializeAttachment($attachment))->values(),
             ])->values(),
         ];
     }
@@ -490,9 +556,24 @@ class TaskController extends Controller
                 'id' => $comment->user->id,
                 'name' => $comment->user->name,
             ] : null,
+            'attachments' => $comment->attachments->map(fn (Attachment $attachment) => $this->serializeAttachment($attachment))->values(),
             'replies' => $comment->replies
                 ->values()
                 ->map(fn (Comment $reply) => $this->serializeComment($reply)),
+        ];
+    }
+
+    private function serializeAttachment(Attachment $attachment): array
+    {
+        return [
+            'id' => $attachment->id,
+            'name' => $attachment->name,
+            'mime_type' => $attachment->mime_type,
+            'size' => $attachment->size,
+            'url' => Storage::disk($attachment->disk)->url($attachment->path),
+            'uploaded_by' => $attachment->uploaded_by,
+            'uploaded_by_name' => $attachment->uploader?->name,
+            'created_at' => $attachment->created_at?->toISOString(),
         ];
     }
 }

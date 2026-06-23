@@ -1,4 +1,5 @@
 import AppSelect from '@/Components/AppSelect';
+import LogoUploadField from '@/Components/LogoUploadField';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
@@ -9,9 +10,17 @@ function WorkspaceCard({ workspace, isCurrent, onEdit, onSelect }) {
         <article className="theme-surface rounded-[2rem] border p-5 shadow-[0_18px_45px_-30px_rgba(101,72,22,0.18)]">
             <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
-                    <div className="theme-muted theme-text-primary flex h-12 w-12 items-center justify-center rounded-2xl">
-                        <FiBriefcase className="h-5 w-5 text-amber-500" />
-                    </div>
+                    {workspace.logo_url ? (
+                        <img
+                            src={workspace.logo_url}
+                            alt={`Logo de ${workspace.name}`}
+                            className="h-12 w-12 rounded-2xl object-cover"
+                        />
+                    ) : (
+                        <div className="theme-muted theme-text-primary flex h-12 w-12 items-center justify-center rounded-2xl">
+                            <FiBriefcase className="h-5 w-5 text-amber-500" />
+                        </div>
+                    )}
                     <div>
                         <div className="flex flex-wrap items-center gap-2">
                             <h3 className="theme-text-primary text-lg font-semibold">{workspace.name}</h3>
@@ -88,6 +97,8 @@ export default function WorkspacesIndex({ workspaces, owners }) {
         name: '',
         description: '',
         owner_id: auth.user.id,
+        logo: null,
+        remove_logo: false,
     });
 
     useEffect(() => {
@@ -97,6 +108,8 @@ export default function WorkspacesIndex({ workspaces, owners }) {
                 name: '',
                 description: '',
                 owner_id: auth.user.id,
+                logo: null,
+                remove_logo: false,
             });
         }
     }, [editingWorkspaceId]);
@@ -106,6 +119,7 @@ export default function WorkspacesIndex({ workspaces, owners }) {
 
         if (editingWorkspaceId) {
             form.patch(route('workspaces.update', editingWorkspaceId), {
+                forceFormData: true,
                 preserveScroll: true,
                 onSuccess: () => setEditingWorkspaceId(null),
             });
@@ -114,6 +128,7 @@ export default function WorkspacesIndex({ workspaces, owners }) {
         }
 
         form.post(route('workspaces.store'), {
+            forceFormData: true,
             preserveScroll: true,
             onSuccess: () => form.reset(),
         });
@@ -125,6 +140,8 @@ export default function WorkspacesIndex({ workspaces, owners }) {
             name: workspace.name,
             description: workspace.description ?? '',
             owner_id: workspace.owner_id,
+            logo: null,
+            remove_logo: false,
         });
     }
 
@@ -221,6 +238,17 @@ export default function WorkspacesIndex({ workspaces, owners }) {
                             </AppSelect>
                             {form.errors.owner_id ? <p className="mt-2 text-sm text-rose-500">{form.errors.owner_id}</p> : null}
                         </div>
+
+                        <LogoUploadField
+                            label="Logo del espacio"
+                            hint="Puedes asociar un logo opcional para identificar este workspace visualmente."
+                            file={form.data.logo}
+                            currentUrl={workspaces.find((workspace) => workspace.id === editingWorkspaceId)?.logo_url ?? null}
+                            removeRequested={form.data.remove_logo}
+                            onFileChange={(file) => form.setData('logo', file)}
+                            onRemoveChange={(value) => form.setData('remove_logo', value)}
+                            error={form.errors.logo}
+                        />
 
                         <div className="flex gap-3">
                             <button
