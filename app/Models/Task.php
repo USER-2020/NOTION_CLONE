@@ -81,7 +81,13 @@ class Task extends Model
 
     public function scopeVisibleForUser(Builder $query, User $user): Builder
     {
-        return $query->whereHas('project', fn (Builder $project) => $project->visibleForUser($user));
+        $query->whereHas('project', fn (Builder $project) => $project->visibleForUser($user));
+
+        if ($user->can('tasks.manage')) {
+            return $query;
+        }
+
+        return $query->assignedToUser($user);
     }
 
     public function scopeAssignedToUser(Builder $query, User $user): Builder

@@ -44,6 +44,15 @@ const projectStatusStyles = {
     completed: 'border-sky-400/30 bg-sky-400/10 text-sky-200',
 };
 
+const taskStatusLabels = {
+    backlog: 'Backlog',
+    todo: 'Por hacer',
+    in_progress: 'En progreso',
+    review: 'Review',
+    done: 'Hecha',
+    blocked: 'Blocked',
+};
+
 function formatFriendlyDateTime(value) {
     if (!value) {
         return 'Sin actualización reciente';
@@ -229,10 +238,10 @@ export default function ProjectShow({ project, workspaces, managerOptions, membe
 
                             <div className="flex flex-col items-start gap-3 xl:items-end">
                                 <div className="flex flex-wrap gap-2 xl:max-w-[240px] xl:justify-end">
-                                    <span className="theme-muted theme-text-secondary rounded-full border px-4 py-2 text-xs uppercase tracking-[0.22em]">
+                                    <span className={`project-priority-badge project-priority-badge-${project.priority} theme-muted theme-text-secondary rounded-full border px-4 py-2 text-xs uppercase tracking-[0.22em]`}>
                                         {priorityLabels[project.priority] ?? project.priority}
                                     </span>
-                                    <span className={`rounded-full border px-4 py-2 text-xs uppercase tracking-[0.22em] ${projectStatusStyles[project.status] ?? 'theme-accent-soft'}`}>
+                                    <span className={`project-main-status-badge project-main-status-badge-${project.status} rounded-full border px-4 py-2 text-xs uppercase tracking-[0.22em] ${projectStatusStyles[project.status] ?? 'theme-accent-soft'}`}>
                                         {statusLabels[project.status] ?? project.status}
                                     </span>
                                 </div>
@@ -325,8 +334,8 @@ export default function ProjectShow({ project, workspaces, managerOptions, membe
                                     >
                                         <div className="flex items-start justify-between gap-3">
                                             <p className="theme-text-primary break-words font-medium">{task.title}</p>
-                                            <span className="theme-text-muted shrink-0 text-[11px] uppercase tracking-[0.22em] transition group-hover:text-[color:var(--accent)]">
-                                                {task.status}
+                                            <span className={`project-task-status-badge project-task-status-badge-${task.status} inline-flex shrink-0 rounded-full border px-2 py-1 text-[10px] font-medium uppercase tracking-[0.14em] transition`}>
+                                                {taskStatusLabels[task.status] ?? task.status}
                                             </span>
                                         </div>
 

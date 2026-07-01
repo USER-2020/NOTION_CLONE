@@ -62,6 +62,34 @@ class AuthorizationFlowTest extends TestCase
             ->assertDontSee($task->title);
     }
 
+    public function test_member_only_sees_assigned_tasks_in_index(): void
+    {
+        [$project, , $member] = $this->projectFixture();
+
+        $assignedTask = Task::create([
+            'project_id' => $project->id,
+            'title' => 'Tarea asignada al miembro',
+            'status' => 'todo',
+            'priority' => 'high',
+            'position' => 1,
+        ]);
+        $assignedTask->assignees()->sync([$member->id]);
+
+        $unassignedTask = Task::create([
+            'project_id' => $project->id,
+            'title' => 'Tarea de otro responsable',
+            'status' => 'todo',
+            'priority' => 'medium',
+            'position' => 2,
+        ]);
+
+        $this->actingAs($member)
+            ->get(route('tasks.index'))
+            ->assertOk()
+            ->assertSee($assignedTask->title)
+            ->assertDontSee($unassignedTask->title);
+    }
+
     public function test_viewer_cannot_edit_pages(): void
     {
         [$project, $manager, $member, $workspace] = $this->projectFixture();

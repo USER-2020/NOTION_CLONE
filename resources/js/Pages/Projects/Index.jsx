@@ -273,7 +273,7 @@ export default function ProjectsIndex({ projects, workspaces }) {
                                                 </div>
 
                                                 <span
-                                                    className={`inline-flex shrink-0 rounded-full border px-2 py-1 text-[10px] font-medium uppercase tracking-[0.12em] sm:px-2.5 sm:tracking-[0.18em] ${
+                                                    className={`project-task-status-badge project-task-status-badge-${task.status} inline-flex shrink-0 rounded-full border px-2 py-1 text-[10px] font-medium uppercase tracking-[0.12em] sm:px-2.5 sm:tracking-[0.18em] ${
                                                         statusStyles[task.status] ?? 'theme-border bg-[color:var(--bg-muted)] theme-text-secondary'
                                                     }`}
                                                 >
