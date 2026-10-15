@@ -701,7 +701,7 @@ export default function AuthenticatedLayout({ user, header, children }) {
     }
 
     return (
-        <div className="theme-shell min-h-screen">
+        <div className={clsx('theme-shell min-h-screen', url.startsWith('/tasks') && 'tasks-layout')}>
             <AppToaster />
             <div className="theme-backdrop fixed inset-0" />
 

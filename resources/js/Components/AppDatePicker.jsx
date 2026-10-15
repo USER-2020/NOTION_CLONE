@@ -105,6 +105,7 @@ export default function AppDatePicker({
     const generatedId = useId();
     const inputId = id ?? generatedId;
     const rootRef = useRef(null);
+    const popoverRef = useRef(null);
     const selectedDate = useMemo(() => parseValue(value), [value]);
     const minValue = useMemo(() => min ?? null, [min]);
     const maxValue = useMemo(() => max ?? null, [max]);
@@ -171,7 +172,7 @@ export default function AppDatePicker({
 
     useEffect(() => {
         function handlePointerDown(event) {
-            if (!rootRef.current?.contains(event.target)) {
+            if (!rootRef.current?.contains(event.target) && !popoverRef.current?.contains(event.target)) {
                 setOpen(false);
             }
         }
@@ -268,6 +269,7 @@ export default function AppDatePicker({
             {open && popoverStyles && typeof document !== 'undefined'
                 ? createPortal(
                     <div
+                        ref={popoverRef}
                         className={clsx(
                             'theme-date-popover fixed z-[90] overflow-hidden rounded-[1.35rem] border shadow-[0_30px_60px_-30px_rgba(15,23,42,0.55)]',
                             popoverClassName

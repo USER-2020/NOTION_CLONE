@@ -22,7 +22,7 @@ import {
     verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { FiCalendar, FiCheck, FiChevronDown, FiClock, FiFileText, FiFlag, FiLink, FiMaximize2, FiMessageCircle, FiPaperclip, FiPlus, FiSave, FiTag, FiTarget, FiTrash2, FiUploadCloud, FiUsers, FiX } from 'react-icons/fi';
+import { FiCalendar, FiCheck, FiChevronDown, FiClock, FiFileText, FiFlag, FiLayers, FiLink, FiMaximize2, FiMessageCircle, FiPaperclip, FiPlus, FiSave, FiSearch, FiTag, FiTarget, FiTrash2, FiUploadCloud, FiUsers, FiX } from 'react-icons/fi';
 
 const columns = [
     { key: 'backlog', label: 'Pendientes', accent: 'text-stone-300' },
@@ -150,6 +150,14 @@ function dateKey(date) {
     const day = String(date.getDate()).padStart(2, '0');
 
     return `${year}-${month}-${day}`;
+}
+
+function keepDueDateAfterStart(currentDueDate, nextStartDate) {
+    if (!nextStartDate || !currentDueDate || currentDueDate >= nextStartDate) {
+        return currentDueDate;
+    }
+
+    return nextStartDate;
 }
 
 function addDays(date, amount) {
@@ -882,6 +890,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
         files: [],
     });
     const [priorityFilter, setPriorityFilter] = useState('all');
+    const [taskSearch, setTaskSearch] = useState('');
     const [taskView, setTaskView] = useState('scrum');
     const dndSensors = useSensors(
         useSensor(PointerSensor, {
@@ -1010,6 +1019,91 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
         });
     }
 
+    function schedulePayload(formData) {
+        return {
+            start_date: formData.start_date || null,
+            due_date: formData.due_date || null,
+        };
+    }
+
+    function updateTaskStartDate(value) {
+        taskForm.setData({
+            ...taskForm.data,
+            start_date: value,
+            due_date: keepDueDateAfterStart(taskForm.data.due_date, value),
+        });
+    }
+
+    function taskHasUnsavedChanges() {
+        if (!selectedTask) {
+            return false;
+        }
+
+        if (!canFullyManageTasks) {
+            return taskForm.data.start_date !== (selectedTask.start_date ?? '')
+                || taskForm.data.due_date !== (selectedTask.due_date ?? '');
+        }
+
+        const currentAssigneeIds = [...(taskForm.data.assignee_ids ?? [])].map(Number).sort((left, right) => left - right);
+        const savedAssigneeIds = [...(selectedTask.assignee_ids ?? [])].map(Number).sort((left, right) => left - right);
+        const currentSubtasks = (taskForm.data.subtasks ?? []).map(({ client_key, ...subtask }) => subtask);
+        const savedSubtasks = (selectedTask.children ?? []).map((subtask) => ({
+            id: subtask.id,
+            title: subtask.title ?? '',
+            status: subtask.status ?? 'todo',
+            assignee_ids: [...(subtask.assignee_ids ?? [])].map(Number).sort((left, right) => left - right),
+            start_date: subtask.start_date ?? '',
+            due_date: subtask.due_date ?? '',
+        }));
+
+        return taskForm.data.title !== (selectedTask.title ?? '')
+            || taskForm.data.description !== (selectedTask.description ?? '')
+            || taskForm.data.status !== (selectedTask.status ?? 'todo')
+            || taskForm.data.priority !== (selectedTask.priority ?? 'medium')
+            || taskForm.data.start_date !== (selectedTask.start_date ?? '')
+            || taskForm.data.due_date !== (selectedTask.due_date ?? '')
+            || JSON.stringify(currentAssigneeIds) !== JSON.stringify(savedAssigneeIds)
+            || JSON.stringify(currentSubtasks) !== JSON.stringify(savedSubtasks);
+    }
+
+    function saveTaskAndClose() {
+        if (!selectedTask) {
+            return;
+        }
+
+        if (taskForm.processing) {
+            return;
+        }
+
+        if (!taskHasUnsavedChanges()) {
+            setSelectedTaskId(null);
+            return;
+        }
+
+        const taskPayload = canFullyManageTasks
+            ? {
+                ...taskForm.data,
+                start_date: taskForm.data.start_date || null,
+                due_date: taskForm.data.due_date || null,
+            }
+            : schedulePayload(taskForm.data);
+        const endpoint = canFullyManageTasks
+            ? route('tasks.update', selectedTask.id)
+            : route('tasks.schedule', selectedTask.id);
+
+        taskForm.patch(endpoint, taskPayload, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setBoardTasks((currentTasks) => currentTasks.map((task) => (
+                    task.id === selectedTask.id
+                        ? { ...task, start_date: taskPayload.start_date, due_date: taskPayload.due_date }
+                        : task
+                )));
+                setSelectedTaskId(null);
+            },
+        });
+    }
+
     function closeCreateTaskModal() {
         setShowCreateTaskModal(false);
         createForm.clearErrors();
@@ -1057,7 +1151,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
     }
 
     function handleTaskDragOver(event) {
-        if (filteringByPriority || !event.over) {
+        if (filteringBoard || !event.over) {
             return;
         }
 
@@ -1252,15 +1346,25 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
     const taskProgress = selectedTask
         ? subtaskProgress({ children: visibleSubtasks })
         : { total: 0, completed: 0, percent: 0 };
-    const filteredBoardTasks = filterTasksByPriority(boardTasks, priorityFilter);
+    const normalizedTaskSearch = taskSearch.trim().toLowerCase();
+    const filteredBoardTasks = filterTasksByPriority(boardTasks, priorityFilter).filter((task) => {
+        if (!normalizedTaskSearch) {
+            return true;
+        }
+
+        return [task.title, task.project?.name, task.description]
+            .filter(Boolean)
+            .some((value) => stripHtml(value).toLowerCase().includes(normalizedTaskSearch));
+    });
     const filteringByPriority = priorityFilter !== 'all';
+    const filteringBoard = filteringByPriority || Boolean(normalizedTaskSearch);
     const completedTasksCount = boardTasks.filter((task) => task.status === 'done').length;
     const sprintVelocity = boardTasks.length ? Math.round((completedTasksCount / boardTasks.length) * 100) : 0;
     const inFlightTasksCount = boardTasks.filter((task) => ['todo', 'in_progress', 'review'].includes(task.status)).length;
     const activeDragTask = activeTaskId ? boardTasks.find((task) => task.id === activeTaskId) : null;
 
     return (
-        <AuthenticatedLayout user={auth.user} header={<div className="flex items-center gap-3"><FiUsers className="h-7 w-7 text-amber-300" /><h2 className="text-3xl font-semibold text-stone-50">Tareas</h2></div>}>
+        <AuthenticatedLayout user={auth.user} header={<div className="flex items-center gap-3"><FiLayers className="h-7 w-7 text-violet-400" /><h2 className="text-3xl font-semibold text-stone-50">Tareas</h2></div>}>
             <Head title="Tareas" />
 
             <div className="space-y-6">
@@ -1271,8 +1375,8 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
 	                                <span className="task-board-kicker">Board</span>
 	                                <span className="truncate">{activeProject ? activeProject.name : 'Workspace sprint'}</span>
 	                            </div>
-	                            <h3 className="mt-3 text-2xl font-semibold tracking-tight text-stone-50">Panel de tareas</h3>
-	                            <p className="mt-1 max-w-2xl text-sm text-stone-400">Prioridad, avance y vista del trabajo en un solo lugar.</p>
+	                            <h3 className="mt-3 text-2xl font-semibold tracking-tight text-stone-50">Colaboración segura y con permisos para proyectos, tareas y documentación interna.</h3>
+	                            <p className="mt-1 max-w-2xl text-sm text-stone-400">Organiza el trabajo del equipo con claridad, fechas y responsables en un solo lugar.</p>
 	                        </div>
 
                         {canCreateTasks ? (
@@ -1282,7 +1386,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                 className="task-create-button inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold transition"
                             >
                                 <FiPlus className="h-4 w-4" />
-                                Crear tarea
+                                Nueva tarea
                             </button>
                         ) : null}
                     </div>
@@ -1312,6 +1416,20 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
 	                    </div>
 
 	                    <div className="task-board-controls">
+                            <label className="task-search-field">
+                                <FiSearch className="h-4 w-4 shrink-0" />
+                                <input
+                                    value={taskSearch}
+                                    onChange={(event) => setTaskSearch(event.target.value)}
+                                    placeholder="Buscar tareas..."
+                                    aria-label="Buscar tareas"
+                                />
+                                {taskSearch ? (
+                                    <button type="button" onClick={() => setTaskSearch('')} aria-label="Limpiar búsqueda">
+                                        <FiX className="h-4 w-4" />
+                                    </button>
+                                ) : null}
+                            </label>
 		                    <div className="task-priority-filter flex flex-col gap-3 rounded-3xl border p-4">
                         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                             <div>
@@ -1396,7 +1514,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
 		                        onDragEnd={handleTaskDragEnd}
 		                        onDragCancel={handleTaskDragCancel}
 		                    >
-		                        <section className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-6">
+		                        <section className="task-board-columns grid gap-4">
 		                            {columns.map((column) => {
 		                                const columnTasks = tasksForStatus(filteredBoardTasks, column.key);
 		                                const sortableItems = columnTasks.map((task) => taskDndId(task.id));
@@ -1420,11 +1538,11 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
 		                                        </div>
 
 		                                        <SortableContext items={sortableItems} strategy={verticalListSortingStrategy}>
-		                                            <DroppableTaskColumn column={column} disabled={filteringByPriority}>
+                                    <DroppableTaskColumn column={column} disabled={filteringBoard}>
 		                                                {columnTasks.length === 0 ? (
 		                                                    <div className="task-empty-dropzone">
 		                                                        <FiPlus className="h-5 w-5" />
-		                                                        {filteringByPriority ? 'Sin tareas para este filtro' : 'Suelta una tarea aquí'}
+                                                {filteringBoard ? 'Sin tareas para este filtro' : 'Suelta una tarea aquí'}
 		                                                    </div>
 		                                                ) : null}
 
@@ -1434,7 +1552,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
 		                                                            key={task.id}
 		                                                            task={task}
 		                                                            onOpen={setSelectedTaskId}
-		                                                            disabled={filteringByPriority}
+                                                                    disabled={filteringBoard}
 		                                                        />
 		                                                    ))}
 		                                                </div>
@@ -1469,7 +1587,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                     <button
                         type="button"
                         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                        onClick={() => setSelectedTaskId(null)}
+                        onClick={saveTaskAndClose}
                     />
 
                     <aside className={`task-detail-panel relative z-10 flex h-[calc(100vh-1.5rem)] w-full ${isTaskDetailExpanded ? 'max-w-5xl' : 'max-w-3xl'} flex-col overflow-hidden rounded-[2rem] border shadow-[0_30px_90px_-45px_rgba(0,0,0,0.55)] transition-all duration-300 sm:h-[calc(100vh-2.5rem)]`}>
@@ -1494,7 +1612,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => setSelectedTaskId(null)}
+                                    onClick={saveTaskAndClose}
                                     className="task-icon-button"
                                     aria-label="Cerrar detalle"
                                 >
@@ -1510,11 +1628,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                         id="task-edit-form"
                                         onSubmit={(event) => {
                                             event.preventDefault();
-
-                                            taskForm.patch(route('tasks.update', selectedTask.id), {
-                                                preserveScroll: true,
-                                                onSuccess: () => setSelectedTaskId(null),
-                                            });
+                                            saveTaskAndClose();
                                         }}
                                     >
                                         <input
@@ -1580,7 +1694,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                             <AppDatePicker
                                                 className="task-property-date"
                                                 value={taskForm.data.start_date}
-                                                onChange={(event) => taskForm.setData('start_date', event.target.value)}
+                                                onChange={(event) => updateTaskStartDate(event.target.value)}
                                                 placeholder="Fecha de inicio"
                                             />
                                         ) : (
@@ -1591,6 +1705,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                         {canFullyManageTasks || canScheduleTasks ? (
                                             <AppDatePicker
                                                 className="task-property-date"
+                                                min={taskForm.data.start_date || undefined}
                                                 value={taskForm.data.due_date}
                                                 onChange={(event) => taskForm.setData('due_date', event.target.value)}
                                                 placeholder="Fecha límite"
@@ -1622,11 +1737,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                         <button
                                             type="button"
                                             disabled={taskForm.processing}
-                                            onClick={() => {
-                                                taskForm.patch(route('tasks.schedule', selectedTask.id), {
-                                                    preserveScroll: true,
-                                                });
-                                            }}
+                                            onClick={saveTaskAndClose}
                                             className="task-drawer-button task-drawer-button-primary inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60"
                                         >
                                             <FiSave className="h-4 w-4" />
@@ -1801,12 +1912,14 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                                                 <div className="grid gap-3 md:grid-cols-2">
                                                                     <AppDatePicker
                                                                         className="border-stone-700 bg-stone-950 text-stone-100"
+                                                                        max={child.due_date || undefined}
                                                                         value={child.start_date ?? ''}
                                                                         onChange={(event) => updateDraftSubtask(child.client_key, { start_date: event.target.value })}
                                                                         placeholder="Fecha de inicio"
                                                                     />
                                                                     <AppDatePicker
                                                                         className="border-stone-700 bg-stone-950 text-stone-100"
+                                                                        min={child.start_date || undefined}
                                                                         value={child.due_date ?? ''}
                                                                         onChange={(event) => updateDraftSubtask(child.client_key, { due_date: event.target.value })}
                                                                         placeholder="Fecha limite"
@@ -1820,10 +1933,10 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
 
                                                                     router.patch(
                                                                         route('tasks.subtasks.schedule', [selectedTask.id, child.id]),
-                                                                        subtaskScheduleDrafts[child.id] ?? {
+                                                                        schedulePayload(subtaskScheduleDrafts[child.id] ?? {
                                                                             start_date: child.start_date ?? '',
                                                                             due_date: child.due_date ?? '',
-                                                                        },
+                                                                        }),
                                                                         { preserveScroll: true }
                                                                     );
                                                                 }}
@@ -1831,12 +1944,14 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                                             >
                                                                 <AppDatePicker
                                                                     className="border-stone-700 bg-stone-950 text-stone-100"
+                                                                    max={subtaskScheduleDrafts[child.id]?.due_date || undefined}
                                                                     value={subtaskScheduleDrafts[child.id]?.start_date ?? ''}
                                                                     onChange={(event) => updateSubtaskScheduleDraft(child.id, 'start_date', event.target.value)}
                                                                     placeholder="Fecha de inicio"
                                                                 />
                                                                 <AppDatePicker
                                                                     className="border-stone-700 bg-stone-950 text-stone-100"
+                                                                    min={subtaskScheduleDrafts[child.id]?.start_date || undefined}
                                                                     value={subtaskScheduleDrafts[child.id]?.due_date ?? ''}
                                                                     onChange={(event) => updateSubtaskScheduleDraft(child.id, 'due_date', event.target.value)}
                                                                     placeholder="Fecha limite"
@@ -2230,6 +2345,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
 
                                 <AppDatePicker
                                     className="text-stone-100"
+                                    max={createForm.data.due_date || undefined}
                                     value={createForm.data.start_date}
                                     onChange={(event) => createForm.setData('start_date', event.target.value)}
                                     placeholder="Fecha de inicio"
@@ -2237,6 +2353,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
 
                                 <AppDatePicker
                                     className="text-stone-100"
+                                    min={createForm.data.start_date || undefined}
                                     value={createForm.data.due_date}
                                     onChange={(event) => createForm.setData('due_date', event.target.value)}
                                     placeholder="Selecciona fecha limite"
