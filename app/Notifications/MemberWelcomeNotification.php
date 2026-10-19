@@ -22,7 +22,7 @@ class MemberWelcomeNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return MailNotifications::enabled() ? ['mail'] : [];
     }
 
     public function toMail(object $notifiable): MailMessage

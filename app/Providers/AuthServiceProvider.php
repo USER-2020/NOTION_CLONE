@@ -7,12 +7,14 @@ use App\Models\Block;
 use App\Models\Page;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\TaskView;
 use App\Models\Workspace;
 use App\Policies\AttachmentPolicy;
 use App\Policies\BlockPolicy;
 use App\Policies\PagePolicy;
 use App\Policies\ProjectPolicy;
 use App\Policies\TaskPolicy;
+use App\Policies\TaskViewPolicy;
 use App\Policies\WorkspacePolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
@@ -30,6 +32,7 @@ class AuthServiceProvider extends ServiceProvider
         Page::class => PagePolicy::class,
         Project::class => ProjectPolicy::class,
         Task::class => TaskPolicy::class,
+        TaskView::class => TaskViewPolicy::class,
         Workspace::class => WorkspacePolicy::class,
     ];
 

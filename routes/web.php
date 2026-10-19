@@ -5,6 +5,7 @@ use App\Http\Controllers\PageController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TaskViewController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\WorkspaceController;
 use Illuminate\Support\Facades\Route;
@@ -51,6 +52,9 @@ Route::middleware(['auth', 'verified', 'password.change.required'])->group(funct
     Route::delete('/tasks/{task}', [TaskController::class, 'destroy'])->name('tasks.destroy');
     Route::post('/tasks/{task}/attachments', [TaskController::class, 'storeAttachment'])->name('tasks.attachments.store');
     Route::delete('/tasks/{task}/attachments/{attachment}', [TaskController::class, 'destroyAttachment'])->name('tasks.attachments.destroy');
+    Route::post('/task-views', [TaskViewController::class, 'store'])->name('task-views.store');
+    Route::patch('/task-views/{taskView}', [TaskViewController::class, 'update'])->name('task-views.update');
+    Route::delete('/task-views/{taskView}', [TaskViewController::class, 'destroy'])->name('task-views.destroy');
     Route::post('/pages', [PageController::class, 'store'])->name('pages.store');
     Route::get('/pages/{page:slug}', [PageController::class, 'show'])->name('pages.show');
     Route::patch('/pages/{page:slug}', [PageController::class, 'update'])->name('pages.update');

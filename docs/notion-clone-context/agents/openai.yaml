@@ -1,0 +1,4 @@
+interface:
+  display_name: "Contexto NOTION_CLONE"
+  short_description: "Arquitectura, módulos y reglas del repositorio"
+  default_prompt: "Usa el contexto del repositorio NOTION_CLONE para implementar este cambio de forma focalizada."

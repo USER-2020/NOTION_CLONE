@@ -8,6 +8,7 @@ use App\Models\Attachment;
 use App\Models\Comment;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\TaskView;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Notifications\TaskAssignedNotification;
@@ -91,6 +92,22 @@ class TaskController extends Controller
                 'id' => $activeProject->id,
                 'name' => $activeProject->name,
             ] : null,
+            'savedViews' => $currentWorkspace
+                ? TaskView::query()
+                    ->where('workspace_id', $currentWorkspace->id)
+                    ->where('user_id', $request->user()->id)
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'view_type', 'filters', 'sorts', 'updated_at'])
+                    ->map(fn (TaskView $view) => [
+                        'id' => $view->id,
+                        'name' => $view->name,
+                        'view_type' => $view->view_type,
+                        'filters' => $view->filters ?? [],
+                        'sorts' => $view->sorts ?? [],
+                        'updated_at' => $view->updated_at?->toISOString(),
+                    ])
+                    ->values()
+                : [],
         ]);
     }
 

@@ -25,6 +25,32 @@ class DashboardController extends Controller
             $visibleTasks->whereHas('project', fn ($query) => $query->where('workspace_id', $currentWorkspace->id));
         }
 
+        $statusKeys = ['backlog', 'todo', 'in_progress', 'review', 'done', 'blocked'];
+        $priorityKeys = ['low', 'medium', 'high', 'urgent'];
+
+        $statusCounts = (clone $visibleTasks)
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        $priorityCounts = (clone $visibleTasks)
+            ->selectRaw('priority, COUNT(*) as total')
+            ->groupBy('priority')
+            ->pluck('total', 'priority');
+
+        $weeklyCompletion = collect(range(6, 0))
+            ->map(function (int $daysAgo) use ($visibleTasks) {
+                $date = now()->subDays($daysAgo);
+
+                return [
+                    'date' => $date->toDateString(),
+                    'count' => (clone $visibleTasks)
+                        ->whereDate('completed_at', $date)
+                        ->count(),
+                ];
+            })
+            ->values();
+
         return Inertia::render('Dashboard', [
             'stats' => [
                 'projectsAssigned' => (clone $visibleProjects)->count(),
@@ -32,6 +58,13 @@ class DashboardController extends Controller
                 'tasksOverdue' => (clone $visibleTasks)->whereDate('due_date', '<', now())->whereNull('completed_at')->count(),
                 'tasksCompletedThisWeek' => (clone $visibleTasks)->whereBetween('completed_at', [now()->startOfWeek(), now()->endOfWeek()])->count(),
             ],
+            'taskStatusDistribution' => collect($statusKeys)
+                ->map(fn (string $key) => ['key' => $key, 'count' => (int) ($statusCounts[$key] ?? 0)])
+                ->values(),
+            'taskPriorityDistribution' => collect($priorityKeys)
+                ->map(fn (string $key) => ['key' => $key, 'count' => (int) ($priorityCounts[$key] ?? 0)])
+                ->values(),
+            'weeklyCompletion' => $weeklyCompletion,
             'tasksToday' => (clone $visibleTasks)
                 ->with(['project:id,name,color'])
                 ->whereDate('due_date', now())

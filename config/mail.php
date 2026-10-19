@@ -13,7 +13,11 @@ return [
     |
     */
 
-    'default' => env('MAIL_MAILER', 'smtp'),
+    'default' => env('MAIL_NOTIFICATIONS_ENABLED', true)
+        ? env('MAIL_MAILER', 'smtp')
+        : 'array',
+
+    'notifications_enabled' => env('MAIL_NOTIFICATIONS_ENABLED'),
 
     /*
     |--------------------------------------------------------------------------

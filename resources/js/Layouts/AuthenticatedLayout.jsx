@@ -442,7 +442,7 @@ function DesktopSidebar({
         <aside
             className={clsx(
                 'theme-surface theme-border fixed inset-y-0 left-0 z-30 hidden border-r backdrop-blur lg:block',
-                collapsed ? 'w-[104px]' : 'w-[300px]'
+                collapsed ? 'w-[88px]' : 'w-[260px]'
             )}
         >
             <div
@@ -705,7 +705,7 @@ export default function AuthenticatedLayout({ user, header, children }) {
             <AppToaster />
             <div className="theme-backdrop fixed inset-0" />
 
-            <div className={clsx('relative min-h-screen overflow-x-clip transition-[padding] duration-300', desktopSidebarCollapsed ? 'lg:pl-[104px]' : 'lg:pl-[300px]')}>
+            <div className={clsx('relative min-h-screen overflow-x-clip transition-[padding] duration-300', desktopSidebarCollapsed ? 'lg:pl-[88px]' : 'lg:pl-[260px]')}>
                 <div
                     className={clsx(
                         'fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition lg:hidden',
@@ -772,11 +772,11 @@ export default function AuthenticatedLayout({ user, header, children }) {
                         </div>
                     </header>
 
-                    <header className="theme-surface hidden shrink-0 border-b backdrop-blur lg:block">
-                        <div className="flex flex-col gap-4 px-6 py-6 lg:flex-row lg:items-center lg:justify-between">
+                    <header className="theme-surface theme-global-header hidden shrink-0 border-b backdrop-blur lg:block">
+                        <div className="flex flex-col gap-3 px-8 py-5 lg:flex-row lg:items-center lg:justify-between">
                             <div>
                                 {header}
-                                <p className="theme-text-secondary mt-2 max-w-2xl text-sm">
+                                <p className="theme-text-secondary mt-1 max-w-2xl text-sm">
                                     Colaboración segura y con permisos para proyectos, tareas y documentación interna.
                                 </p>
                             </div>

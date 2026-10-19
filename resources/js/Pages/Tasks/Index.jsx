@@ -22,7 +22,7 @@ import {
     verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { FiCalendar, FiCheck, FiChevronDown, FiClock, FiFileText, FiFlag, FiLayers, FiLink, FiMaximize2, FiMessageCircle, FiPaperclip, FiPlus, FiSave, FiSearch, FiTag, FiTarget, FiTrash2, FiUploadCloud, FiUsers, FiX } from 'react-icons/fi';
+import { FiBookmark, FiCalendar, FiCheck, FiChevronDown, FiClock, FiFileText, FiFlag, FiLayers, FiLink, FiMaximize2, FiMessageCircle, FiPaperclip, FiPlus, FiSave, FiSearch, FiTag, FiTarget, FiTrash2, FiUploadCloud, FiUsers, FiX } from 'react-icons/fi';
 
 const columns = [
     { key: 'backlog', label: 'Pendientes', accent: 'text-stone-300' },
@@ -89,6 +89,14 @@ function filterTasksByPriority(tasks, priority) {
     }
 
     return tasks.filter((task) => task.priority === priority);
+}
+
+function filterTasksByStatus(tasks, status) {
+    if (status === 'all') {
+        return tasks;
+    }
+
+    return tasks.filter((task) => task.status === status);
 }
 
 function moveTaskInBoard(tasks, taskId, targetStatus, targetIndex) {
@@ -482,6 +490,7 @@ function MemberPicker({ label, hint, members, selectedIds, onChange }) {
                                 key={member.id}
                                 type="button"
                                 onClick={() => toggleMember(member.id)}
+                                aria-pressed={active}
                                 className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition ${active
                                         ? 'border-[color:var(--accent)] bg-[color:var(--accent-soft)] text-[color:var(--text-primary)] shadow-[0_16px_30px_-24px_rgba(217,119,6,0.35)]'
                                         : 'theme-surface theme-border theme-text-secondary hover:border-[color:var(--accent)]'
@@ -494,13 +503,8 @@ function MemberPicker({ label, hint, members, selectedIds, onChange }) {
                                     <p className="truncate text-sm font-medium">{member.name}</p>
                                 </div>
 
-                                <span
-                                    className={`ml-3 flex h-5 w-5 items-center justify-center rounded-md border transition ${active
-                                            ? 'border-[color:var(--accent)] bg-[color:var(--accent)] text-white'
-                                            : 'theme-border bg-transparent text-transparent'
-                                        }`}
-                                >
-                                    <FiCheck className="h-3.5 w-3.5" />
+                                <span className={`task-member-switch ${active ? 'task-member-switch-active' : ''}`} aria-hidden="true">
+                                    <span className="task-member-switch-thumb" />
                                 </span>
                             </button>
                         );
@@ -865,7 +869,7 @@ function CalendarView({ tasks, onOpen }) {
     );
 }
 
-export default function TasksIndex({ tasks, projects, filters = {}, activeProject = null }) {
+export default function TasksIndex({ tasks, projects, filters = {}, activeProject = null, savedViews = [] }) {
     const { auth } = usePage().props;
     const isMember = auth.roles?.includes('member');
     const canCreateTasks = !isMember && auth.permissions?.includes('tasks.manage');
@@ -890,8 +894,15 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
         files: [],
     });
     const [priorityFilter, setPriorityFilter] = useState('all');
+    const [statusFilter, setStatusFilter] = useState('all');
     const [taskSearch, setTaskSearch] = useState('');
     const [taskView, setTaskView] = useState('scrum');
+    const taskSearchInputRef = useRef(null);
+    const [activeSavedViewId, setActiveSavedViewId] = useState(null);
+    const [showSaveViewModal, setShowSaveViewModal] = useState(false);
+    const saveViewForm = useForm({
+        name: '',
+    });
     const dndSensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
@@ -938,7 +949,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
         setBoardTasks(tasks);
 
         if (!tasks.length) {
-            setSelectedTaskId(null);
+            closeTaskCanvas();
             return;
         }
 
@@ -949,7 +960,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
         }
 
         if (selectedTaskId !== null && !tasks.some((task) => task.id === selectedTaskId)) {
-            setSelectedTaskId(null);
+            closeTaskCanvas();
         }
     }, [requestedTaskId, selectedTaskId, tasks]);
 
@@ -960,6 +971,32 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
     }, [filteredProjectId, projects]);
 
     const selectedTask = boardTasks.find((task) => task.id === selectedTaskId) ?? null;
+
+    function updateTaskCanvasUrl(taskId) {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        const params = new URLSearchParams(window.location.search);
+        if (taskId) {
+            params.set('task_id', taskId);
+        } else {
+            params.delete('task_id');
+        }
+
+        const query = params.toString();
+        window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
+    }
+
+    function openTaskCanvas(taskId) {
+        setSelectedTaskId(taskId);
+        updateTaskCanvasUrl(taskId);
+    }
+
+    function closeTaskCanvas() {
+        setSelectedTaskId(null);
+        updateTaskCanvasUrl(null);
+    }
 
     useEffect(() => {
         if (!selectedTask) {
@@ -999,7 +1036,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                 ])
             )
         );
-    }, [selectedTask]);
+    }, [selectedTask?.id]);
 
     function membersForProject(projectId) {
         return projects.find((project) => project.id === projectId)?.members ?? [];
@@ -1066,7 +1103,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
             || JSON.stringify(currentSubtasks) !== JSON.stringify(savedSubtasks);
     }
 
-    function saveTaskAndClose() {
+    function saveTask({ closeOnSuccess = false } = {}) {
         if (!selectedTask) {
             return;
         }
@@ -1076,7 +1113,9 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
         }
 
         if (!taskHasUnsavedChanges()) {
-            setSelectedTaskId(null);
+            if (closeOnSuccess) {
+                closeTaskCanvas();
+            }
             return;
         }
 
@@ -1096,17 +1135,102 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
             onSuccess: () => {
                 setBoardTasks((currentTasks) => currentTasks.map((task) => (
                     task.id === selectedTask.id
-                        ? { ...task, start_date: taskPayload.start_date, due_date: taskPayload.due_date }
+                        ? {
+                            ...task,
+                            title: taskPayload.title ?? task.title,
+                            description: taskPayload.description ?? task.description,
+                            status: taskPayload.status ?? task.status,
+                            priority: taskPayload.priority ?? task.priority,
+                            start_date: taskPayload.start_date,
+                            due_date: taskPayload.due_date,
+                            assignee_ids: taskPayload.assignee_ids ?? task.assignee_ids,
+                        }
                         : task
                 )));
-                setSelectedTaskId(null);
+                taskForm.clearErrors();
+                if (closeOnSuccess) {
+                    closeTaskCanvas();
+                }
             },
         });
     }
 
+    function saveTaskAndClose() {
+        saveTask({ closeOnSuccess: true });
+    }
+
+    useEffect(() => {
+        function handleKeyboardShortcut(event) {
+            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+                event.preventDefault();
+                taskSearchInputRef.current?.focus();
+                return;
+            }
+
+            if (event.key === 'Escape' && selectedTaskId && !showCreateTaskModal && !taskForm.processing) {
+                event.preventDefault();
+                saveTaskAndClose();
+            }
+        }
+
+        window.addEventListener('keydown', handleKeyboardShortcut);
+
+        return () => window.removeEventListener('keydown', handleKeyboardShortcut);
+    }, [selectedTaskId, showCreateTaskModal, taskForm.processing, taskForm.data]);
+
     function closeCreateTaskModal() {
         setShowCreateTaskModal(false);
         createForm.clearErrors();
+    }
+
+    function openSavedView(view) {
+        setActiveSavedViewId(view.id);
+        setTaskView(view.view_type ?? 'scrum');
+        setPriorityFilter(view.filters?.priority ?? 'all');
+        setStatusFilter(view.filters?.status ?? 'all');
+        setTaskSearch('');
+    }
+
+    function handleSaveView(event) {
+        event.preventDefault();
+
+        saveViewForm.transform((data) => ({
+            ...data,
+            view_type: taskView,
+            filters: {
+                priority: priorityFilter,
+                status: statusFilter,
+            },
+            sorts: {},
+        }));
+
+        saveViewForm.post(route('task-views.store'), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowSaveViewModal(false);
+                saveViewForm.reset();
+            },
+            onFinish: () => saveViewForm.transform((data) => data),
+        });
+    }
+
+    function deleteSavedView(view) {
+        if (!view) {
+            return;
+        }
+
+        if (!window.confirm(`Eliminar la vista "${view.name}"?`)) {
+            return;
+        }
+
+        router.delete(route('task-views.destroy', view.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                if (activeSavedViewId === view.id) {
+                    setActiveSavedViewId(null);
+                }
+            },
+        });
     }
 
     function getDndDestination(overId, activeId, sourceTasks = boardTasks) {
@@ -1347,7 +1471,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
         ? subtaskProgress({ children: visibleSubtasks })
         : { total: 0, completed: 0, percent: 0 };
     const normalizedTaskSearch = taskSearch.trim().toLowerCase();
-    const filteredBoardTasks = filterTasksByPriority(boardTasks, priorityFilter).filter((task) => {
+    const filteredBoardTasks = filterTasksByStatus(filterTasksByPriority(boardTasks, priorityFilter), statusFilter).filter((task) => {
         if (!normalizedTaskSearch) {
             return true;
         }
@@ -1357,7 +1481,8 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
             .some((value) => stripHtml(value).toLowerCase().includes(normalizedTaskSearch));
     });
     const filteringByPriority = priorityFilter !== 'all';
-    const filteringBoard = filteringByPriority || Boolean(normalizedTaskSearch);
+    const filteringByStatus = statusFilter !== 'all';
+    const filteringBoard = filteringByPriority || filteringByStatus || Boolean(normalizedTaskSearch);
     const completedTasksCount = boardTasks.filter((task) => task.status === 'done').length;
     const sprintVelocity = boardTasks.length ? Math.round((completedTasksCount / boardTasks.length) * 100) : 0;
     const inFlightTasksCount = boardTasks.filter((task) => ['todo', 'in_progress', 'review'].includes(task.status)).length;
@@ -1416,20 +1541,67 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
 	                    </div>
 
 	                    <div className="task-board-controls">
-                            <label className="task-search-field">
-                                <FiSearch className="h-4 w-4 shrink-0" />
-                                <input
-                                    value={taskSearch}
-                                    onChange={(event) => setTaskSearch(event.target.value)}
-                                    placeholder="Buscar tareas..."
-                                    aria-label="Buscar tareas"
-                                />
-                                {taskSearch ? (
-                                    <button type="button" onClick={() => setTaskSearch('')} aria-label="Limpiar búsqueda">
-                                        <FiX className="h-4 w-4" />
+                            <div className="task-saved-view-toolbar flex flex-wrap items-center gap-2 rounded-3xl border border-stone-800 bg-stone-950/40 p-2">
+                                <FiBookmark className="ml-2 h-4 w-4 text-stone-500" />
+                                <select
+                                    value={activeSavedViewId ?? ''}
+                                    onChange={(event) => {
+                                        const view = savedViews.find((item) => String(item.id) === event.target.value);
+                                        if (view) {
+                                            openSavedView(view);
+                                        }
+                                    }}
+                                    className="min-w-[12rem] flex-1 border-0 bg-transparent text-sm text-stone-200 outline-none focus:ring-0"
+                                    aria-label="Cargar vista guardada"
+                                >
+                                    <option value="">Vistas guardadas</option>
+                                    {savedViews.map((view) => (
+                                        <option key={view.id} value={view.id}>{view.name}</option>
+                                    ))}
+                                </select>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSaveViewModal(true)}
+                                    className="task-priority-chip inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-medium transition"
+                                >
+                                    <FiSave className="h-3.5 w-3.5" />
+                                    Guardar vista
+                                </button>
+                                {activeSavedViewId ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => deleteSavedView(savedViews.find((view) => view.id === activeSavedViewId))}
+                                        className="task-priority-chip inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-medium transition"
+                                        aria-label="Eliminar vista guardada"
+                                    >
+                                        <FiTrash2 className="h-3.5 w-3.5" />
                                     </button>
                                 ) : null}
-                            </label>
+                            </div>
+                            <div className="task-search-stack">
+                                <label className="task-search-field">
+                                    <FiSearch className="h-4 w-4 shrink-0" />
+                                    <input
+                                        ref={taskSearchInputRef}
+                                        value={taskSearch}
+                                        onChange={(event) => {
+                                            setActiveSavedViewId(null);
+                                            setTaskSearch(event.target.value);
+                                        }}
+                                        placeholder="Buscar tareas..."
+                                        aria-label="Buscar tareas"
+                                    />
+                                    {taskSearch ? (
+                                        <button type="button" onClick={() => { setActiveSavedViewId(null); setTaskSearch(''); }} aria-label="Limpiar búsqueda">
+                                            <FiX className="h-4 w-4" />
+                                        </button>
+                                    ) : null}
+                                    <kbd className="hidden rounded-md border border-stone-700 px-1.5 py-0.5 text-[10px] text-stone-500 sm:inline-block">Ctrl K</kbd>
+                                </label>
+                                <p className="px-1 text-xs text-stone-500" aria-live="polite">
+                                    {filteredBoardTasks.length} {filteredBoardTasks.length === 1 ? 'tarea visible' : 'tareas visibles'}
+                                </p>
+                            </div>
 		                    <div className="task-priority-filter flex flex-col gap-3 rounded-3xl border p-4">
                         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                             <div>
@@ -1442,7 +1614,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                             {filteringByPriority && (
                                 <button
                                     type="button"
-                                    onClick={() => setPriorityFilter('all')}
+                                    onClick={() => { setActiveSavedViewId(null); setPriorityFilter('all'); }}
                                     className="task-priority-chip inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-medium transition"
                                 >
                                     <FiX className="h-3.5 w-3.5" />
@@ -1454,7 +1626,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                         <div className="flex flex-wrap gap-2">
                             <button
                                 type="button"
-                                onClick={() => setPriorityFilter('all')}
+                                onClick={() => { setActiveSavedViewId(null); setPriorityFilter('all'); }}
                                 className={`rounded-full px-4 py-2 text-sm font-medium transition ${priorityFilter === 'all'
                                         ? 'task-priority-chip-active'
                                         : 'task-priority-chip'
@@ -1467,7 +1639,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                 <button
                                     key={priority}
                                     type="button"
-                                    onClick={() => setPriorityFilter(priority)}
+                                    onClick={() => { setActiveSavedViewId(null); setPriorityFilter(priority); }}
                                     className={`rounded-full px-4 py-2 text-sm font-medium transition ${priorityFilter === priority
                                             ? 'task-priority-chip-active'
                                             : 'task-priority-chip'
@@ -1478,11 +1650,24 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                             ))}
                         </div>
 
-                        {filteringByPriority && (
+                        {(filteringByPriority || filteringByStatus) && (
                             <p className="text-xs text-stone-500">
                                 El arrastre entre columnas se pausa mientras el filtro está activo para evitar reordenamientos incompletos.
                             </p>
 	                        )}
+
+                        <div className="flex flex-wrap items-center gap-2 border-t border-stone-800 pt-3">
+                            <span className="text-xs uppercase tracking-[0.2em] text-stone-500">Estado</span>
+                            <select
+                                value={statusFilter}
+                                onChange={(event) => { setActiveSavedViewId(null); setStatusFilter(event.target.value); }}
+                                className="rounded-xl border border-stone-700 bg-stone-950 px-3 py-2 text-sm text-stone-200"
+                                aria-label="Filtrar por estado"
+                            >
+                                <option value="all">Todos los estados</option>
+                                {columns.map((column) => <option key={column.key} value={column.key}>{column.label}</option>)}
+                            </select>
+                        </div>
 		                    </div>
 
 		                    <div className="task-view-switcher rounded-3xl border p-2">
@@ -1493,7 +1678,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
 	                                <button
 	                                    key={option.key}
 	                                    type="button"
-	                                    onClick={() => setTaskView(option.key)}
+                                    onClick={() => { setActiveSavedViewId(null); setTaskView(option.key); }}
 	                                    className={`task-view-option ${taskView === option.key ? 'task-view-option-active' : ''}`}
 	                                >
 	                                    <Icon className="h-4 w-4" />
@@ -1551,7 +1736,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
 		                                                        <SortableTaskCard
 		                                                            key={task.id}
 		                                                            task={task}
-		                                                            onOpen={setSelectedTaskId}
+		                                                            onOpen={openTaskCanvas}
                                                                     disabled={filteringBoard}
 		                                                        />
 		                                                    ))}
@@ -1574,11 +1759,11 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
 		                )}
 
 	                {taskView === 'timeline' && (
-	                    <TimelineView tasks={filteredBoardTasks} onOpen={setSelectedTaskId} />
+		                                    <TimelineView tasks={filteredBoardTasks} onOpen={openTaskCanvas} />
 	                )}
 
 	                {taskView === 'calendar' && (
-	                    <CalendarView tasks={filteredBoardTasks} onOpen={setSelectedTaskId} />
+	                    <CalendarView tasks={filteredBoardTasks} onOpen={openTaskCanvas} />
 	                )}
 	            </div>
 
@@ -1588,9 +1773,16 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                         type="button"
                         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                         onClick={saveTaskAndClose}
+                        aria-label="Cerrar detalle de tarea"
                     />
 
-                    <aside className={`task-detail-panel relative z-10 flex h-[calc(100vh-1.5rem)] w-full ${isTaskDetailExpanded ? 'max-w-5xl' : 'max-w-3xl'} flex-col overflow-hidden rounded-[2rem] border shadow-[0_30px_90px_-45px_rgba(0,0,0,0.55)] transition-all duration-300 sm:h-[calc(100vh-2.5rem)]`}>
+                    <aside
+                        role="dialog"
+                        aria-modal="true"
+                        aria-describedby="task-detail-canvas-description"
+                        aria-label={`Detalle de tarea: ${selectedTask.title}`}
+                        className={`task-detail-panel relative z-10 flex h-[calc(100vh-1.5rem)] w-full ${isTaskDetailExpanded ? 'max-w-6xl' : 'max-w-5xl'} flex-col overflow-hidden rounded-[1.35rem] border shadow-[0_30px_90px_-45px_rgba(0,0,0,0.55)] transition-all duration-300 sm:h-[calc(100vh-2.5rem)]`}
+                    >
                         <div className="task-detail-header flex items-center justify-between gap-4 border-b px-5 py-4 sm:px-6">
                             <div className="min-w-0">
                                 <div className="flex min-w-0 items-center gap-2 text-xs">
@@ -1606,7 +1798,8 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                     type="button"
                                     onClick={() => setIsTaskDetailExpanded((currentValue) => !currentValue)}
                                     className="task-icon-button"
-                                    aria-label={isTaskDetailExpanded ? 'Reducir detalle' : 'Expandir detalle'}
+                                    aria-label={isTaskDetailExpanded ? 'Reducir detalle' : 'Abrir como página completa'}
+                                    title={isTaskDetailExpanded ? 'Reducir detalle' : 'Abrir como página completa'}
                                 >
                                     <FiMaximize2 className="h-4 w-4" />
                                 </button>
@@ -1628,7 +1821,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                         id="task-edit-form"
                                         onSubmit={(event) => {
                                             event.preventDefault();
-                                            saveTaskAndClose();
+                                            saveTask();
                                         }}
                                     >
                                         <input
@@ -1642,6 +1835,11 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                     <h3 className="task-detail-title">{selectedTask.title}</h3>
                                 )}
 
+                                <p id="task-detail-canvas-description" className="sr-only">
+                                    Ventana lateral de la tarea. Los cambios se guardan sin cerrar este detalle.
+                                </p>
+
+                                <aside className="task-detail-property-column" aria-label="Propiedades de la tarea">
                                 <div className="task-property-list">
                                     <TaskPropertyRow icon={FiFlag} label="Estado">
                                         {canFullyManageTasks ? (
@@ -1731,13 +1929,14 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                         <span className="task-property-value">{selectedTask.project?.name ?? 'Sin proyecto'}</span>
                                     </TaskPropertyRow>
                                 </div>
+                                </aside>
 
                                 {!canFullyManageTasks && canScheduleTasks ? (
                                     <div className="mt-3 flex justify-end">
                                         <button
                                             type="button"
                                             disabled={taskForm.processing}
-                                            onClick={saveTaskAndClose}
+                                            onClick={() => saveTask()}
                                             className="task-drawer-button task-drawer-button-primary inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60"
                                         >
                                             <FiSave className="h-4 w-4" />
@@ -1779,6 +1978,13 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                         })
                                         .map((tab) => {
                                             const Icon = tab.icon;
+                                            const tabCount = tab.key === 'subtasks'
+                                                ? (selectedTask.children?.length ?? 0)
+                                                : tab.key === 'comments'
+                                                    ? (selectedTask.comments?.length ?? 0)
+                                                    : tab.key === 'files'
+                                                        ? (selectedTask.attachments?.length ?? 0)
+                                                        : 0;
 
                                             return (
                                                 <button
@@ -1789,8 +1995,10 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                                 >
                                                     <Icon className="h-4 w-4" />
                                                     {tab.label}
-                                                    {tab.key === 'comments' && selectedTask.comments?.length ? (
-                                                        <span className="task-tab-count">{selectedTask.comments.length}</span>
+                                                    {tabCount > 0 ? (
+                                                        <span className="task-tab-count" aria-label={`${tabCount} ${tab.label.toLowerCase()}`}>
+                                                            {tabCount}
+                                                        </span>
                                                     ) : null}
                                                 </button>
                                             );
@@ -1911,14 +2119,14 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                                                 />
                                                                 <div className="grid gap-3 md:grid-cols-2">
                                                                     <AppDatePicker
-                                                                        className="border-stone-700 bg-stone-950 text-stone-100"
+                                                                        className="task-property-date"
                                                                         max={child.due_date || undefined}
                                                                         value={child.start_date ?? ''}
                                                                         onChange={(event) => updateDraftSubtask(child.client_key, { start_date: event.target.value })}
                                                                         placeholder="Fecha de inicio"
                                                                     />
                                                                     <AppDatePicker
-                                                                        className="border-stone-700 bg-stone-950 text-stone-100"
+                                                                        className="task-property-date"
                                                                         min={child.start_date || undefined}
                                                                         value={child.due_date ?? ''}
                                                                         onChange={(event) => updateDraftSubtask(child.client_key, { due_date: event.target.value })}
@@ -1943,14 +2151,14 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                                                 className="mt-4 grid gap-3 md:grid-cols-2"
                                                             >
                                                                 <AppDatePicker
-                                                                    className="border-stone-700 bg-stone-950 text-stone-100"
+                                                                    className="task-property-date"
                                                                     max={subtaskScheduleDrafts[child.id]?.due_date || undefined}
                                                                     value={subtaskScheduleDrafts[child.id]?.start_date ?? ''}
                                                                     onChange={(event) => updateSubtaskScheduleDraft(child.id, 'start_date', event.target.value)}
                                                                     placeholder="Fecha de inicio"
                                                                 />
                                                                 <AppDatePicker
-                                                                    className="border-stone-700 bg-stone-950 text-stone-100"
+                                                                    className="task-property-date"
                                                                     min={subtaskScheduleDrafts[child.id]?.start_date || undefined}
                                                                     value={subtaskScheduleDrafts[child.id]?.due_date ?? ''}
                                                                     onChange={(event) => updateSubtaskScheduleDraft(child.id, 'due_date', event.target.value)}
@@ -2241,8 +2449,19 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                 </div>
                             </section>}
 
-                            {canFullyManageTasks && (
-                                <section className="task-detail-footer">
+                        </div>
+                        {canFullyManageTasks && (
+                            <section className="task-detail-footer" aria-label="Acciones de la tarea">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="task-detail-save-state" role="status" aria-live="polite">
+                                        <span className={`task-detail-save-dot ${taskForm.processing ? 'task-detail-save-dot-saving' : ''}`} />
+                                        {taskForm.processing
+                                            ? 'Guardando cambios…'
+                                            : taskHasUnsavedChanges()
+                                                ? 'Cambios sin guardar'
+                                                : 'Cambios guardados'}
+                                    </div>
+
                                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
                                         <button
                                             type="submit"
@@ -2251,7 +2470,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                             className="task-drawer-button task-drawer-button-primary inline-flex items-center justify-center gap-2 rounded-2xl border px-5 py-3 font-medium transition disabled:cursor-not-allowed disabled:opacity-60"
                                         >
                                             <FiSave className="h-4 w-4" />
-                                            Guardar tarea
+                                            Guardar cambios
                                         </button>
 
                                         <button
@@ -2259,7 +2478,7 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                             onClick={() => {
                                                 router.delete(route('tasks.destroy', selectedTask.id), {
                                                     preserveScroll: true,
-                                                    onSuccess: () => setSelectedTaskId(null),
+                                                    onSuccess: closeTaskCanvas,
                                                 });
                                             }}
                                             className="task-drawer-button task-drawer-button-danger inline-flex items-center justify-center gap-2 rounded-2xl border px-5 py-3 transition"
@@ -2268,15 +2487,15 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                             Eliminar tarea
                                         </button>
                                     </div>
-                                </section>
-                            )}
-                        </div>
+                                </div>
+                            </section>
+                        )}
                     </aside>
                 </div>
             )}
-            <Modal show={showCreateTaskModal} onClose={closeCreateTaskModal} maxWidth="2xl">
-                <div className="p-4 sm:p-6">
-                    <div className="flex items-start justify-between gap-4 rounded-[1.75rem] border border-[color:var(--border)] bg-[color:var(--bg-surface)]/80 p-4 sm:p-5">
+            <Modal show={showCreateTaskModal} onClose={closeCreateTaskModal} maxWidth="5xl">
+                <div className="task-create-modal p-4 sm:p-6">
+                    <div className="task-create-modal-header flex items-start justify-between gap-4 rounded-[1.35rem] border p-4 sm:p-5">
                         <div className="min-w-0">
                             <p className="text-[11px] uppercase tracking-[0.32em] text-amber-300">Nueva tarea</p>
                             <h3 className="mt-2 text-2xl font-semibold text-stone-50 sm:text-[2rem]">Crear tarea</h3>
@@ -2295,23 +2514,31 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                         </button>
                     </div>
 
-                    <form onSubmit={handleCreateTask} className="mt-5 space-y-4 sm:mt-6">
-                        <div className="rounded-[1.75rem] border border-[color:var(--border)] bg-[color:var(--bg-surface)]/80 p-4 sm:p-5">
-                            <div className="grid gap-4 xl:grid-cols-2">
-                                <AppSelect value={createForm.data.project_id} onChange={(event) => createForm.setData('project_id', event.target.value)}>
+                    <form onSubmit={handleCreateTask} className="task-create-form mt-5 sm:mt-6">
+                        <div className="task-create-layout">
+                        <div className="task-create-section rounded-[1.35rem] border p-4 sm:p-5">
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <label className="task-create-field">
+                                    <span>Proyecto</span>
+                                    <AppSelect id="create-task-project" value={createForm.data.project_id} onChange={(event) => createForm.setData('project_id', event.target.value)}>
                                     {projects.map((project) => (
                                         <option key={project.id} value={project.id}>
                                             {project.name}
                                         </option>
                                     ))}
-                                </AppSelect>
+                                    </AppSelect>
+                                </label>
 
-                                <input
+                                <label className="task-create-field">
+                                    <span>Título</span>
+                                    <input
+                                        id="create-task-title"
                                     className="theme-input w-full rounded-2xl border px-4 py-3 text-base text-stone-100"
                                     placeholder="Título de la tarea"
                                     value={createForm.data.title}
                                     onChange={(event) => createForm.setData('title', event.target.value)}
-                                />
+                                    />
+                                </label>
                             </div>
 
                             <div className="mt-4">
@@ -2325,43 +2552,55 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                             </div>
                         </div>
 
-                        <div className="rounded-[1.75rem] border border-[color:var(--border)] bg-[color:var(--bg-surface)]/80 p-4 sm:p-5">
-                            <div className="grid gap-4 lg:grid-cols-4">
-                                <AppSelect value={createForm.data.status} onChange={(event) => createForm.setData('status', event.target.value)}>
-                                    {columns.map((column) => (
-                                        <option key={column.key} value={column.key}>
-                                            {column.label}
-                                        </option>
-                                    ))}
-                                </AppSelect>
+                        <div className="task-create-section rounded-[1.35rem] border p-4 sm:p-5">
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <label className="task-create-field">
+                                    <span>Estado</span>
+                                    <PropertyBadgeDropdown
+                                        label="Cambiar estado"
+                                        items={columns}
+                                        value={createForm.data.status}
+                                        onChange={(status) => createForm.setData('status', status)}
+                                        renderBadge={(status) => <StatusBadge status={status} />}
+                                    />
+                                </label>
 
-                                <AppSelect value={createForm.data.priority} onChange={(event) => createForm.setData('priority', event.target.value)}>
-                                    {priorities.map((priority) => (
-                                        <option key={priority} value={priority}>
-                                            {priorityLabels[priority] ?? priority}
-                                        </option>
-                                    ))}
-                                </AppSelect>
+                                <label className="task-create-field">
+                                    <span>Prioridad</span>
+                                    <PropertyBadgeDropdown
+                                        label="Cambiar prioridad"
+                                        items={priorities.map((priority) => ({ key: priority }))}
+                                        value={createForm.data.priority}
+                                        onChange={(priority) => createForm.setData('priority', priority)}
+                                        renderBadge={(priority) => <PriorityBadge priority={priority} />}
+                                    />
+                                </label>
 
-                                <AppDatePicker
-                                    className="text-stone-100"
-                                    max={createForm.data.due_date || undefined}
-                                    value={createForm.data.start_date}
-                                    onChange={(event) => createForm.setData('start_date', event.target.value)}
-                                    placeholder="Fecha de inicio"
-                                />
+                                <div className="task-create-field">
+                                    <span>Inicio</span>
+                                    <AppDatePicker
+                                        className="text-stone-100"
+                                        max={createForm.data.due_date || undefined}
+                                        value={createForm.data.start_date}
+                                        onChange={(event) => createForm.setData('start_date', event.target.value)}
+                                        placeholder="Fecha de inicio"
+                                    />
+                                </div>
 
-                                <AppDatePicker
-                                    className="text-stone-100"
-                                    min={createForm.data.start_date || undefined}
-                                    value={createForm.data.due_date}
-                                    onChange={(event) => createForm.setData('due_date', event.target.value)}
-                                    placeholder="Selecciona fecha limite"
-                                />
+                                <div className="task-create-field">
+                                    <span>Vencimiento</span>
+                                    <AppDatePicker
+                                        className="text-stone-100"
+                                        min={createForm.data.start_date || undefined}
+                                        value={createForm.data.due_date}
+                                        onChange={(event) => createForm.setData('due_date', event.target.value)}
+                                        placeholder="Selecciona fecha limite"
+                                    />
+                                </div>
                             </div>
                         </div>
 
-                        <div className="rounded-[1.75rem] border border-[color:var(--border)] bg-[color:var(--bg-surface)]/80 p-4 sm:p-5">
+                        <div className="task-create-section rounded-[1.35rem] border p-4 sm:p-5">
                             <MemberPicker
                                 label="Responsables"
                                 hint="Puedes seleccionar varios miembros del proyecto."
@@ -2370,26 +2609,27 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                                 onChange={(selectedIds) => createForm.setData('assignee_ids', selectedIds)}
                             />
                         </div>
+                        </div>
 
                         {(createForm.errors.title || createForm.errors.project_id) && (
-                            <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                            <div className="mt-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
                                 {createForm.errors.title || createForm.errors.project_id}
                             </div>
                         )}
 
-                        <div className="sticky bottom-0 -mx-4 border-t border-[color:var(--border)] bg-[color:var(--bg-surface-strong)]/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6">
+                        <div className="sticky bottom-0 mt-4 -mx-4 border-t border-[color:var(--border)] bg-[color:var(--bg-surface-strong)]/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6">
                             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                                 <button
                                     type="button"
                                     onClick={closeCreateTaskModal}
-                                    className="theme-surface theme-text-secondary inline-flex min-h-12 items-center justify-center rounded-2xl border border-[color:var(--border-strong)] px-5 py-3 text-sm font-medium transition hover:opacity-90"
+                                    className="task-create-cancel theme-surface theme-text-secondary inline-flex min-h-12 items-center justify-center rounded-2xl border px-5 py-3 text-sm font-medium transition"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={createForm.processing}
-                                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-amber-300 px-5 py-3 font-medium text-stone-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
+                                    className="task-create-submit inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-5 py-3 font-medium transition disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                     <FiPlus className="h-4 w-4" />
                                     Crear tarea
@@ -2398,6 +2638,53 @@ export default function TasksIndex({ tasks, projects, filters = {}, activeProjec
                         </div>
                     </form>
                 </div>
+            </Modal>
+
+            <Modal
+                show={showSaveViewModal}
+                onClose={() => { setShowSaveViewModal(false); saveViewForm.clearErrors(); }}
+                maxWidth="md"
+            >
+                <form onSubmit={handleSaveView} className="space-y-5 p-5 sm:p-6">
+                    <div>
+                        <p className="text-[11px] uppercase tracking-[0.28em] text-amber-300">Vista del workspace</p>
+                        <h3 className="mt-2 text-2xl font-semibold text-stone-50">Guardar configuración actual</h3>
+                        <p className="mt-2 text-sm leading-6 text-stone-400">
+                            Guarda el tipo de vista y sus filtros para volver a tu flujo sin configurarlo de nuevo.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label htmlFor="saved-view-name" className="mb-2 block text-sm font-medium text-stone-200">Nombre</label>
+                        <input
+                            id="saved-view-name"
+                            autoFocus
+                            value={saveViewForm.data.name}
+                            onChange={(event) => saveViewForm.setData('name', event.target.value)}
+                            placeholder="Ej. Prioridad alta del sprint"
+                            className="theme-input w-full rounded-2xl border px-4 py-3 text-stone-100"
+                        />
+                        {saveViewForm.errors.name ? <p className="mt-2 text-sm text-rose-300">{saveViewForm.errors.name}</p> : null}
+                    </div>
+
+                    <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        <button
+                            type="button"
+                            onClick={() => setShowSaveViewModal(false)}
+                            className="theme-surface theme-text-secondary rounded-2xl border px-5 py-3 text-sm font-medium"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={saveViewForm.processing || !saveViewForm.data.name.trim()}
+                            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-300 px-5 py-3 text-sm font-medium text-stone-950 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <FiSave className="h-4 w-4" />
+                            Guardar vista
+                        </button>
+                    </div>
+                </form>
             </Modal>
         </AuthenticatedLayout>
     );
